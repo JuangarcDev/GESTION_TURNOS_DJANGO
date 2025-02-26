@@ -40,6 +40,8 @@ INSTALLED_APPS = [
 
     # Framework para crear APIs
     'rest_framework',
+    # API de Turnos
+    'turnos_api'
 ]
 
 MIDDLEWARE = [
