@@ -17,7 +17,7 @@ class EstadoTurno(models.Model):
     def __str__(self):
         return self.nombre
     
-class Proceso(models.Model):
+class TipoTramite(models.Model):
     nombre = models.CharField(max_length=50, unique=True)
     
     def __str__(self):
@@ -51,7 +51,7 @@ class Turno(models.Model):
     turno = models.CharField(max_length=20)
     tipo_turno = models.ForeignKey(TipoTurno, on_delete=models.PROTECT)
     estado = models.ForeignKey(EstadoTurno, on_delete=models.PROTECT)
-    proceso = models.ForeignKey(Proceso, on_delete=models.PROTECT)
+    tipo_tramite = models.ForeignKey(TipoTramite, on_delete=models.PROTECT)
     fecha_turno = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -94,3 +94,4 @@ class Puesto(models.Model):
 
     def __str__(self):
         return f"{self.id_funcionario.nombre} - {self.id_ventanilla.nombre}"
+    
