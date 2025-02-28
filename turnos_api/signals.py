@@ -16,7 +16,7 @@ def poblar_tablas_dominio(sender, **kwargs):
             EstadoTurno.objects.get_or_create(nombre=estado)
 
         # Poblar TipoTramite
-        tramites = ["Tramite", "Notificación", "Correspondencia", "Producto", "Orientación"]
+        tramites = ["Tramite Consulta", "Tramite Radicacion", "Producto Consulta", "Producto Emisión", "Correspondencia", "Notificación"]
         for tramite in tramites:
             TipoTramite.objects.get_or_create(nombre=tramite)
 
