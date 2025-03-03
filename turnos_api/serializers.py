@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from.models import Funcionario, Ventanila, Turno
+from.models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto
 
 class FuncionarioSerializer(serializers.ModelSerializer):
     class Meta:
@@ -14,4 +14,19 @@ class VentanillaSerializer(serializers.ModelSerializer):
 class TurnoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Turno
+        fields = '__all__'
+
+class UsuarioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Usuario
+        fields = '__all__'
+
+class AtencionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Atencion
+        fields = '__all__'
+
+class PuestoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Puesto
         fields = '__all__'
