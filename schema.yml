@@ -1,0 +1,1257 @@
+openapi: 3.0.3
+info:
+  title: Gestion Turnos API
+  version: 0.1.0
+  description: Una Aplicación para gestionar turnos, tanto generales como prioritarios
+    y que permita apartar citas online
+paths:
+  /api/atenciones/:
+    get:
+      operationId: api_atenciones_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Atencion'
+          description: ''
+    post:
+      operationId: api_atenciones_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Atencion'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Atencion'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Atencion'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Atencion'
+          description: ''
+  /api/atenciones/{id}/:
+    get:
+      operationId: api_atenciones_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this atencion.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Atencion'
+          description: ''
+    put:
+      operationId: api_atenciones_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this atencion.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Atencion'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Atencion'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Atencion'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Atencion'
+          description: ''
+    patch:
+      operationId: api_atenciones_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this atencion.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAtencion'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAtencion'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAtencion'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Atencion'
+          description: ''
+    delete:
+      operationId: api_atenciones_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this atencion.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/funcionarios/:
+    get:
+      operationId: api_funcionarios_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Funcionario'
+          description: ''
+    post:
+      operationId: api_funcionarios_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Funcionario'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Funcionario'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Funcionario'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Funcionario'
+          description: ''
+  /api/funcionarios/{id}/:
+    get:
+      operationId: api_funcionarios_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this funcionario.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Funcionario'
+          description: ''
+    put:
+      operationId: api_funcionarios_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this funcionario.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Funcionario'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Funcionario'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Funcionario'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Funcionario'
+          description: ''
+    patch:
+      operationId: api_funcionarios_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this funcionario.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFuncionario'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFuncionario'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFuncionario'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Funcionario'
+          description: ''
+    delete:
+      operationId: api_funcionarios_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this funcionario.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/puestos/:
+    get:
+      operationId: api_puestos_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Puesto'
+          description: ''
+    post:
+      operationId: api_puestos_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Puesto'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Puesto'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Puesto'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Puesto'
+          description: ''
+  /api/puestos/{id}/:
+    get:
+      operationId: api_puestos_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this puesto.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Puesto'
+          description: ''
+    put:
+      operationId: api_puestos_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this puesto.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Puesto'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Puesto'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Puesto'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Puesto'
+          description: ''
+    patch:
+      operationId: api_puestos_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this puesto.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPuesto'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPuesto'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPuesto'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Puesto'
+          description: ''
+    delete:
+      operationId: api_puestos_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this puesto.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/token/:
+    post:
+      operationId: api_token_create
+      description: |-
+        Takes a set of user credentials and returns an access and refresh JSON web
+        token pair to prove the authentication of those credentials.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenObtainPair'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenObtainPair'
+          description: ''
+  /api/token/refresh/:
+    post:
+      operationId: api_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefresh'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/turnos/:
+    get:
+      operationId: api_turnos_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Turno'
+          description: ''
+    post:
+      operationId: api_turnos_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Turno'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Turno'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Turno'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turno'
+          description: ''
+  /api/turnos/{id}/:
+    get:
+      operationId: api_turnos_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this turno.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turno'
+          description: ''
+    put:
+      operationId: api_turnos_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this turno.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Turno'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Turno'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Turno'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turno'
+          description: ''
+    patch:
+      operationId: api_turnos_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this turno.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTurno'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTurno'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTurno'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turno'
+          description: ''
+    delete:
+      operationId: api_turnos_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this turno.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/usuarios/:
+    get:
+      operationId: api_usuarios_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Usuario'
+          description: ''
+    post:
+      operationId: api_usuarios_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Usuario'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Usuario'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Usuario'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+          description: ''
+  /api/usuarios/{id}/:
+    get:
+      operationId: api_usuarios_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this usuario.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+          description: ''
+    put:
+      operationId: api_usuarios_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this usuario.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Usuario'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Usuario'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Usuario'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+          description: ''
+    patch:
+      operationId: api_usuarios_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this usuario.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUsuario'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUsuario'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUsuario'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+          description: ''
+    delete:
+      operationId: api_usuarios_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this usuario.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/ventanillas/:
+    get:
+      operationId: api_ventanillas_list
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ventanilla'
+          description: ''
+    post:
+      operationId: api_ventanillas_create
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Ventanilla'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Ventanilla'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Ventanilla'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ventanilla'
+          description: ''
+  /api/ventanillas/{id}/:
+    get:
+      operationId: api_ventanillas_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ventanila.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ventanilla'
+          description: ''
+    put:
+      operationId: api_ventanillas_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ventanila.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Ventanilla'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Ventanilla'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Ventanilla'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ventanilla'
+          description: ''
+    patch:
+      operationId: api_ventanillas_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ventanila.
+        required: true
+      tags:
+      - api
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedVentanilla'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedVentanilla'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedVentanilla'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ventanilla'
+          description: ''
+    delete:
+      operationId: api_ventanillas_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this ventanila.
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+components:
+  schemas:
+    Atencion:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        fecha_atencion:
+          type: string
+          format: date-time
+          readOnly: true
+        id_funcionario:
+          type: integer
+        id_turno:
+          type: integer
+      required:
+      - fecha_atencion
+      - id
+      - id_funcionario
+      - id_turno
+    Funcionario:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        usario:
+          type: string
+          maxLength: 50
+        password:
+          type: string
+          maxLength: 255
+        nombre:
+          type: string
+          maxLength: 100
+        telefono:
+          type: string
+          nullable: true
+          maxLength: 10
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 100
+        fecha_creacion:
+          type: string
+          format: date-time
+          readOnly: true
+        fecha_edicion:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - fecha_creacion
+      - fecha_edicion
+      - id
+      - nombre
+      - password
+      - usario
+    PatchedAtencion:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        fecha_atencion:
+          type: string
+          format: date-time
+          readOnly: true
+        id_funcionario:
+          type: integer
+        id_turno:
+          type: integer
+    PatchedFuncionario:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        usario:
+          type: string
+          maxLength: 50
+        password:
+          type: string
+          maxLength: 255
+        nombre:
+          type: string
+          maxLength: 100
+        telefono:
+          type: string
+          nullable: true
+          maxLength: 10
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 100
+        fecha_creacion:
+          type: string
+          format: date-time
+          readOnly: true
+        fecha_edicion:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedPuesto:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        fecha_ingreso:
+          type: string
+          format: date-time
+          readOnly: true
+        fecha_salida:
+          type: string
+          format: date-time
+          nullable: true
+        id_funcionario:
+          type: integer
+        id_ventanilla:
+          type: integer
+    PatchedTurno:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        turno:
+          type: string
+          maxLength: 20
+        fecha_turno:
+          type: string
+          format: date-time
+          readOnly: true
+        id_usuario:
+          type: integer
+        tipo_turno:
+          type: integer
+        estado:
+          type: integer
+        tipo_tramite:
+          type: integer
+    PatchedUsuario:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        nombre:
+          type: string
+          maxLength: 100
+        cedula:
+          type: string
+          maxLength: 20
+        telefono:
+          type: string
+          nullable: true
+          maxLength: 10
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 100
+        direccion:
+          type: string
+          nullable: true
+          maxLength: 100
+        municipio:
+          type: string
+          maxLength: 100
+        fecha_registro:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedVentanilla:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        nombre:
+          type: string
+          maxLength: 50
+        fecha_creacion:
+          type: string
+          format: date-time
+          readOnly: true
+        fecha_edicion:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        estado:
+          type: integer
+    Puesto:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        fecha_ingreso:
+          type: string
+          format: date-time
+          readOnly: true
+        fecha_salida:
+          type: string
+          format: date-time
+          nullable: true
+        id_funcionario:
+          type: integer
+        id_ventanilla:
+          type: integer
+      required:
+      - fecha_ingreso
+      - id
+      - id_funcionario
+      - id_ventanilla
+    TokenObtainPair:
+      type: object
+      properties:
+        username:
+          type: string
+          writeOnly: true
+        password:
+          type: string
+          writeOnly: true
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - password
+      - refresh
+      - username
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+          writeOnly: true
+      required:
+      - access
+      - refresh
+    Turno:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        turno:
+          type: string
+          maxLength: 20
+        fecha_turno:
+          type: string
+          format: date-time
+          readOnly: true
+        id_usuario:
+          type: integer
+        tipo_turno:
+          type: integer
+        estado:
+          type: integer
+        tipo_tramite:
+          type: integer
+      required:
+      - estado
+      - fecha_turno
+      - id
+      - id_usuario
+      - tipo_tramite
+      - tipo_turno
+      - turno
+    Usuario:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        nombre:
+          type: string
+          maxLength: 100
+        cedula:
+          type: string
+          maxLength: 20
+        telefono:
+          type: string
+          nullable: true
+          maxLength: 10
+        email:
+          type: string
+          format: email
+          nullable: true
+          maxLength: 100
+        direccion:
+          type: string
+          nullable: true
+          maxLength: 100
+        municipio:
+          type: string
+          maxLength: 100
+        fecha_registro:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - cedula
+      - fecha_registro
+      - id
+      - municipio
+      - nombre
+    Ventanilla:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        nombre:
+          type: string
+          maxLength: 50
+        fecha_creacion:
+          type: string
+          format: date-time
+          readOnly: true
+        fecha_edicion:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        estado:
+          type: integer
+      required:
+      - estado
+      - fecha_creacion
+      - fecha_edicion
+      - id
+      - nombre
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

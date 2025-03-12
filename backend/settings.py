@@ -41,14 +41,17 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     # Framework para crear APIs
     'rest_framework',
+    # Framework documentacion Endpoints DRF Spectacular
+    'drf_spectacular',
     # API de Turnos
-    'turnos_api'
+    'turnos_api',
 ]
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 MIDDLEWARE = [
@@ -137,3 +140,11 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Gestion Turnos API',
+    'DESCRIPTION': 'Una Aplicación para gestionar turnos, tanto generales como prioritarios y que permita apartar citas online',
+    'VERSION': '0.1.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # OTHER SETTINGS
+}
