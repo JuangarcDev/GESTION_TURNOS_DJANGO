@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from rest_framework import serializers
 from.models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto
 
@@ -29,4 +30,9 @@ class AtencionSerializer(serializers.ModelSerializer):
 class PuestoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Puesto
+        fields = '__all__'
+
+class UsuarioAutenticadoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
         fields = '__all__'

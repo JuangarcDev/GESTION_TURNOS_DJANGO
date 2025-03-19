@@ -1,8 +1,11 @@
+from django.contrib.auth.models import User
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from django.shortcuts import render
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from .models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto
-from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer
+from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer
 
 # Create your views here.
 class FuncionarioViewSet(viewsets.ModelViewSet):
@@ -34,3 +37,12 @@ class PuestoViewSet(viewsets.ModelViewSet):
     queryset = Puesto.objects.all()
     serializer_class = PuestoSerializer
     permission_classes = [IsAuthenticated]
+
+#  API VIEW USUARIO AUTENTICADO
+class UsuarioActualView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        Usuario = request.user
+        serializer = UsuarioAutenticadoSerializer(Usuario)
+        return Response(serializer.data)
