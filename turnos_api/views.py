@@ -22,7 +22,7 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
                 self.get_queryset(),
                 FuncionarioSerializer,
                 "La consulta ha sido exitosa",
-                "No se encontraron funcionarios en la base de datos"
+                "No se encontraron registros en la base de datos"
             )
         except CustomAPIException as e:
             return Response(e.detail, status=e.status_code)
@@ -44,7 +44,7 @@ class VentanillaViewSet(viewsets.ModelViewSet):
                 self.get_queryset(),
                 VentanillaSerializer,
                 "La consulta ha sido exitosa",
-                "No se encontraron turnos en la base de datos"
+                "No se encontraron registros en la base de datos"
             )
         except CustomAPIException as e:
             return Response(e.detail, status=e.status_code)
@@ -66,7 +66,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
                 self.get_queryset(),
                 TurnoSerializer,
                 "La consulta ha sido exitosa",
-                "No se encontraron turnos en la base de datos"
+                "No se encontraron registros en la base de datos"
             )
         except CustomAPIException as e:
             return Response(e.detail, status=e.status_code)
@@ -88,7 +88,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
                 self.get_queryset(),
                 UsuarioSerializer,
                 "La consulta ha sido exitosa",
-                "No se encontraron turnos en la base de datos"
+                "No se encontraron registros en la base de datos"
             )
         except CustomAPIException as e:
             return Response(e.detail, status=e.status_code)
@@ -110,7 +110,7 @@ class AtencionViewSet(viewsets.ModelViewSet):
                 self.get_queryset(),
                 AtencionSerializer,
                 "La consulta ha sido exitosa",
-                "No se encontraron turnos en la base de datos"
+                "No se encontraron registros en la base de datos"
             )
         except CustomAPIException as e:
             return Response(e.detail, status=e.status_code)
@@ -132,7 +132,7 @@ class PuestoViewSet(viewsets.ModelViewSet):
                 self.get_queryset(),
                 PuestoSerializer,
                 "La consulta ha sido exitosa",
-                "No se encontraron turnos en la base de datos"
+                "No se encontraron registros en la base de datos"
             )
         except CustomAPIException as e:
             return Response(e.detail, status=e.status_code)
