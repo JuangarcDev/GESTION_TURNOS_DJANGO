@@ -45,6 +45,8 @@ INSTALLED_APPS = [
     'drf_spectacular',
     # API de Turnos
     'turnos_api',
+    # Graphviz
+    'django_extensions',
 ]
 
 REST_FRAMEWORK = {
