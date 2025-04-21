@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.utils.dateparse import parse_date
 from rest_framework.views import APIView
 from django.shortcuts import render
 from rest_framework import viewsets, status
@@ -97,6 +98,34 @@ class TurnoViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Estado no válido. Valores permitidos: 1, 2, 3, 4.'}, status=400)
         
         turnos = Turno.objects.filter(estado_id=estado_id).order_by('fecha_turno')
+        serializer = TurnoSerializer(turnos, many=True)
+        return Response(serializer.data)
+    
+    #ACA CREAREMOS EL ENDPOINT PARA BUSCAR POR EL NOMBRE Y OPCIONALMENTE UNA FECHA
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name='turno', required=False, type=str, location=OpenApiParameter.QUERY, description='Nombre (o parte del nombre) del turno'),
+            OpenApiParameter(name='fecha_turno', required=False, type=str, location=OpenApiParameter.QUERY, description='Fecha del turno en formato YYYY-MM-DD')
+        ]
+    )
+
+    @action(detail=False, methods=['get'], url_path='buscar-por-nombre-fecha')
+    def buscar_por_nombre_fecha(self, request):
+        turno = request.GET.get('turno', '').strip()
+        fecha_turno = request.GET.get('fecha_turno', '').strip()
+
+        turnos = Turno.objects.all()
+
+        if turno:
+            turnos = turnos.filter(turno__icontains=turno)
+
+        if fecha_turno:
+            fecha = parse_date(fecha_turno)
+            if not fecha:
+                return Response({'error': 'Formato de fecha inválido. Use YYYY-MM-DD.'}, status=400)
+            turnos = turnos.filter(fecha_turno__date=fecha)
+
+        turnos = turnos.order_by('fecha_turno')
         serializer = TurnoSerializer(turnos, many=True)
         return Response(serializer.data)
 
