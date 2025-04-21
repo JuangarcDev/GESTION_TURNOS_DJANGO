@@ -3,7 +3,7 @@ from django.contrib.auth.models import User, AbstractBaseUser
 
 # --------------------------------------
 # TABLAS DE DOMINIO
-# -------------------------------------
+# --------------------------------------
 
 class TipoTurno(models.Model):
     nombre = models.CharField(max_length=50, unique=True)

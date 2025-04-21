@@ -11,6 +11,7 @@ router.register(r'usuarios', UsuarioViewSet)
 router.register(r'atenciones', AtencionViewSet)
 router.register(r'puestos', PuestoViewSet)
 
+
 urlpatterns = [
     path('', include(router.urls)),
     path('me/', UsuarioActualView.as_view(), name='usuario_actual'),
