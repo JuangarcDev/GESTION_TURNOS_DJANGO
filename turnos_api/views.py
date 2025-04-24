@@ -16,7 +16,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter
 class FuncionarioViewSet(viewsets.ModelViewSet):
     queryset = Funcionario.objects.all()
     serializer_class = FuncionarioSerializer
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
@@ -39,7 +39,7 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
 class VentanillaViewSet(viewsets.ModelViewSet):
     queryset = Ventanila.objects.all()
     serializer_class = VentanillaSerializer
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
@@ -61,7 +61,7 @@ class VentanillaViewSet(viewsets.ModelViewSet):
 class TurnoViewSet(viewsets.ModelViewSet):
     queryset = Turno.objects.all()
     serializer_class = TurnoSerializer
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
@@ -132,7 +132,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
     serializer_class = UsuarioSerializer
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
@@ -154,7 +154,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
 class AtencionViewSet(viewsets.ModelViewSet):
     queryset = Atencion.objects.all()
     serializer_class = AtencionSerializer
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
@@ -176,7 +176,7 @@ class AtencionViewSet(viewsets.ModelViewSet):
 class PuestoViewSet(viewsets.ModelViewSet):
     queryset = Puesto.objects.all()
     serializer_class = PuestoSerializer
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
@@ -197,7 +197,7 @@ class PuestoViewSet(viewsets.ModelViewSet):
 
 #  API VIEW USUARIO AUTENTICADO
 class UsuarioActualView(APIView):
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
 
     def get(self, request):
         Usuario = request.user

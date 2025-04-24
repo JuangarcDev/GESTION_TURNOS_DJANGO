@@ -25,9 +25,11 @@ SECRET_KEY = 'django-insecure-8(6($t!0iwh@@+5t8re*q4bt-8w0h0n#m!i#^1(k-w6xo0=%(b
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
-
+ALLOWED_HOSTS = ['*', 'http://localhost:4200']
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:4200",
+]
 # Application definition
 
 INSTALLED_APPS = [
@@ -47,6 +49,7 @@ INSTALLED_APPS = [
     'turnos_api',
     # Graphviz
     'django_extensions',
+    'corsheaders',
 ]
 
 REST_FRAMEWORK = {
@@ -64,6 +67,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'backend.urls'
