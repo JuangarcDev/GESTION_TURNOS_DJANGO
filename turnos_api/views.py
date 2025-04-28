@@ -154,35 +154,42 @@ class TurnoViewSet(viewsets.ModelViewSet):
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
     serializer_class = UsuarioSerializer
-    #permission_classes = [IsAuthenticated]
-
 
     def get_permissions(self):
-        if self.action == 'create':  # POST
+        if self.action in ['create', 'buscar_por_cedula']:  # POST crear usuario o GET buscar por cédula
             return [AllowAny()]
-        if self.action == 'retrieve':  # GET detalle (consultar 1 usuario por ID o documento)
-            return [AllowAny()]
-        return [IsAuthenticated()]  # Para list, update, partial_update, destroy
+        return [IsAuthenticated()]  # Para retrieve (por ID), list, update, destroy, etc.
 
     def retrieve(self, request, *args, **kwargs):
-        """Permitir solo la búsqueda por número de documento."""
-        cedula = self.request.query_params.get('cedula', None)
-        if cedula:
-            usuario = Usuario.objects.filter(cedula=cedula).first()
-            if usuario:
-                serializer = self.get_serializer(usuario)
-                return Response({
-                    "success": True,
-                    "message": "Usuario encontrado exitosamente.",
-                    "data": serializer.data
-                }, status=200)
-            else:
-                return Response({
-                    "success": False,
-                    "message": "No se encontró ningún usuario con el documento proporcionado."
-                }, status=404)
+        """Consulta de usuario por ID (protegida por token)."""
         return super().retrieve(request, *args, **kwargs)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name='cedula', required=True, type=str, location=OpenApiParameter.QUERY, description='Número de cédula del usuario')
+        ]
+    )
+    @action(detail=False, methods=['get'], url_path='buscar-por-cedula')
+    def buscar_por_cedula(self, request):
+        """Consulta pública de usuario por número de cédula."""
+        cedula = request.query_params.get('cedula', '').strip()
+
+        if not cedula:
+            return Response({'success': False, 'message': 'Debe proporcionar una cédula.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        usuario = Usuario.objects.filter(cedula=cedula).first()
+
+        if not usuario:
+            return Response({'success': False, 'message': 'No se encontró ningún usuario con la cédula proporcionada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(usuario)
+        return Response({
+            'success': True,
+            'message': 'Usuario encontrado exitosamente.',
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
     
+        
 class AtencionViewSet(viewsets.ModelViewSet):
     queryset = Atencion.objects.all()
     serializer_class = AtencionSerializer
