@@ -3,7 +3,7 @@ from django.contrib.auth.models import User, AbstractBaseUser
 
 # --------------------------------------
 # TABLAS DE DOMINIO
-# -------------------------------------
+# --------------------------------------
 
 class TipoTurno(models.Model):
     nombre = models.CharField(max_length=50, unique=True)
@@ -35,7 +35,8 @@ class EstadoVentanilla(models.Model):
 # ---------------------------------------------
 
 class Usuario(models.Model):
-    nombre = models.CharField(max_length=100)
+    nombres = models.CharField(max_length=100)
+    apellidos = models.CharField(max_length=100)
     cedula = models.CharField(max_length=20, unique=True)
     telefono = models.CharField(max_length=10, blank=True, null=True)
     email = models.EmailField(max_length=100, blank=True, null=True)
