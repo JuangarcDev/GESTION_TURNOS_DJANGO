@@ -45,7 +45,7 @@ class Usuario(models.Model):
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.nombre} - {self.cedula}"
+        return f"{self.nombres} - {self.apellidos} - {self.cedula}"
     
 class Turno(models.Model):
     id_usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name="turnos")
