@@ -59,7 +59,7 @@ class Turno(models.Model):
         return f"Turno {self.turno} - {self.estado.nombre}"
     
 class Funcionario(models.Model):
-    usario = models.CharField(max_length=50, unique=True)
+    usuario = models.CharField(max_length=50, unique=True)
     password = models.CharField(max_length=255)
     nombre = models.CharField(max_length=100)
     telefono = models.CharField(max_length=10, blank=True, null=True)

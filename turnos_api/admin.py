@@ -58,13 +58,13 @@ class TurnoAdmin(admin.ModelAdmin):
 
 @admin.register(Funcionario)
 class FuncionarioAdmin(admin.ModelAdmin):
-    list_display = ('usario', 'nombre', 'telefono', 'email', 'fecha_creacion', 'fecha_edicion')
-    search_fields = ('usario', 'nombre', 'email')
-    ordering = ('usario',)
+    list_display = ('usuario', 'nombre', 'telefono', 'email', 'fecha_creacion', 'fecha_edicion')
+    search_fields = ('usuario', 'nombre', 'email')
+    ordering = ('usuario',)
     readonly_fields = ('fecha_creacion', 'fecha_edicion')
     fieldsets = (
         ('Información de Acceso', {
-            'fields': ('usario', 'password')
+            'fields': ('usuario', 'password')
         }),
         ('Datos Personales', {
             'fields': ('nombre', 'telefono', 'email')
