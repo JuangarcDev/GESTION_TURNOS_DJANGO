@@ -17,6 +17,7 @@ class TurnoSerializer(serializers.ModelSerializer):
         model = Turno
         fields = '__all__'
 
+
 class UsuarioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Usuario

@@ -6,11 +6,27 @@ from rest_framework.views import APIView
 from django.shortcuts import render
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto
+from .models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno
 from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer
 from .utils import handle_custom_exception
 from .exceptions import CustomAPIException
 from drf_spectacular.utils import extend_schema, OpenApiParameter
+from django.utils.timezone import now
+from django.db.models import Count
+from datetime import datetime
+
+# UTILIDAD MOVER POSTERIORMENTE A SU PROPIO FICHERO
+
+def generar_nombre_turno(tipo_tramite_abrev, tipo_turno_abrev):
+    hoy = now().date()
+    contador = Turno.objects.filter(
+        fecha_turno__date=hoy,
+        tipo_tramite__abreviado=tipo_tramite_abrev,
+        tipo_turno__abreviado=tipo_turno_abrev
+     ).count() + 1
+    
+    secuencia = str(contador).zfill(3)
+    return f"{tipo_tramite_abrev}{tipo_turno_abrev}{secuencia}"
 
 # Create your views here.
 class FuncionarioViewSet(viewsets.ModelViewSet):
@@ -62,6 +78,31 @@ class TurnoViewSet(viewsets.ModelViewSet):
     queryset = Turno.objects.all()
     serializer_class = TurnoSerializer
     #permission_classes = [IsAuthenticated]
+
+    def create(self, request, *args, **kwargs):
+        data = request.data.copy()
+
+        # Obtener la hora actual como fecha_turno por defecto
+        if 'fecha_turno' not in data or not data['fecha_turno']:
+            data['fecha_turno'] = now()
+
+        # Estado del turno por defecto en espera
+        if 'estado' not in data or not data['estado']:
+            data['estado'] = 1
+
+        # Generar el nombre del turno
+        if 'turno' not in data or not data['turno']:
+            try:
+                tramite_abrev = Turno.objects.model.tipo_tramite.field.related_model.objects.get(id=int(data['tipo_tramite'])).abreviado
+                tipo_abrev = Turno.objects.model.tipo_turno.field.related_model.objects.get(id=int(data['tipo_turno'])).abreviado
+                data['turno'] = generar_nombre_turno(tramite_abrev, tipo_abrev)
+            except Exception as e:
+                return Response({'error': f'Error generando el nombre del turno: {str(e)}'}, status=400)
+        
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def list(self, request, *args, **kwargs):
         try:
