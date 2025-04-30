@@ -13,7 +13,7 @@ from .exceptions import CustomAPIException
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from django.utils.timezone import now
 from django.db.models import Count
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # UTILIDAD MOVER POSTERIORMENTE A SU PROPIO FICHERO
 
@@ -79,6 +79,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
     serializer_class = TurnoSerializer
     #permission_classes = [IsAuthenticated]
 
+    # Sobreescribimos metodo create, para completar automaticámente el valor de los 3 atributos(fecha_turno, estado y turno) cuando se cree un nuevo registro de turno
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
 
@@ -190,7 +191,30 @@ class TurnoViewSet(viewsets.ModelViewSet):
             return Response({'message': 'No se encontraron turnos para el documento proporcionado.'}, status=404)
 
         serializer = TurnoSerializer(turnos, many=True)
-        return Response(serializer.data)    
+        return Response(serializer.data)
+    
+"""
+    #PARTE PARA IMPLEMENTAR LOS ULTIMOS 6 TURNOS, PERO QUE LOS TRAIGA DE ATENCION DIRECTAMENTEc
+    @action(detail=False, methods=['get'], url_path='ultimos-6')
+    def ultimos_6(self, request):
+        hoy = now().date()
+        turnos = Turno.objects.filter(
+            fecha_turno__date=hoy
+        ).select_related('id_usuario').order_by('-fecha_turno')[:6]
+
+        resultado = []
+        for turno in turnos:
+            usuario = turno.id_usuario
+            resultado.append({
+                'turno': turno.turno,
+                'fecha_turno': turno.fecha_turno,
+                'estado': turno.estado,
+                'nombres': usuario.nombres if usuario else None,
+                'apellidos': usuario.apellidos if usuario else None,
+            })
+
+        return Response(resultado)
+"""
 
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()

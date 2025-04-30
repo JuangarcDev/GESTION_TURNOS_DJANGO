@@ -73,15 +73,7 @@ class Funcionario(models.Model):
 
     def __str__(self):
         return self.nombre
-    
-class Atencion(models.Model):
-    id_funcionario = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name="atenciones")
-    id_turno = models.OneToOneField(Turno, on_delete=models.CASCADE, related_name="atencion")
-    fecha_atencion = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Atención de {self.id_turno.turno} por {self.id_funcionario.nombre}"
-    
+       
 class Ventanila(models.Model):
     nombre = models.CharField(max_length=50, unique=True)
     estado = models.ForeignKey(EstadoVentanilla, on_delete=models.PROTECT)
@@ -90,6 +82,16 @@ class Ventanila(models.Model):
 
     def __str__(self):
         return f"{self.nombre} - {self.estado.nombre}"
+    
+class Atencion(models.Model):
+    id_funcionario = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name="atenciones")
+    id_turno = models.OneToOneField(Turno, on_delete=models.CASCADE, related_name="atencion")
+    id_ventanilla = models.ForeignKey(Ventanila, on_delete=models.PROTECT, related_name="atencion_ventanilla")
+    fecha_atencion = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Atención de {self.id_turno.turno} por {self.id_funcionario.nombre}"
+ 
     
 class Puesto(models.Model):
     id_funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE, related_name="puestos")
