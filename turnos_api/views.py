@@ -79,6 +79,12 @@ class TurnoViewSet(viewsets.ModelViewSet):
     serializer_class = TurnoSerializer
     permission_classes = [IsAuthenticated]
 
+    # Permitimos que el metodo POST sea público o no requiera de Autenticación
+    def get_permissions(self):
+        if self.action == 'create':
+            return [] # Permitir que sea público el método POST
+        return super().get_permissions()
+
     # Sobreescribimos metodo create, para completar automaticámente el valor de los 3 atributos(fecha_turno, estado y turno) cuando se cree un nuevo registro de turno
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
@@ -193,28 +199,6 @@ class TurnoViewSet(viewsets.ModelViewSet):
         serializer = TurnoSerializer(turnos, many=True)
         return Response(serializer.data)
     
-"""
-    #PARTE PARA IMPLEMENTAR LOS ULTIMOS 6 TURNOS, PERO QUE LOS TRAIGA DE ATENCION DIRECTAMENTEc
-    @action(detail=False, methods=['get'], url_path='ultimos-6')
-    def ultimos_6(self, request):
-        hoy = now().date()
-        turnos = Turno.objects.filter(
-            fecha_turno__date=hoy
-        ).select_related('id_usuario').order_by('-fecha_turno')[:6]
-
-        resultado = []
-        for turno in turnos:
-            usuario = turno.id_usuario
-            resultado.append({
-                'turno': turno.turno,
-                'fecha_turno': turno.fecha_turno,
-                'estado': turno.estado,
-                'nombres': usuario.nombres if usuario else None,
-                'apellidos': usuario.apellidos if usuario else None,
-            })
-
-        return Response(resultado)
-"""
 
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
