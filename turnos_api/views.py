@@ -11,7 +11,7 @@ from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSeria
 from .utils import handle_custom_exception
 from .exceptions import CustomAPIException
 from drf_spectacular.utils import extend_schema, OpenApiParameter
-from django.utils.timezone import now
+from django.utils.timezone import now, localtime
 from django.db.models import Count
 from datetime import datetime, timedelta
 
@@ -32,7 +32,7 @@ def generar_nombre_turno(tipo_tramite_abrev, tipo_turno_abrev):
 class FuncionarioViewSet(viewsets.ModelViewSet):
     queryset = Funcionario.objects.all()
     serializer_class = FuncionarioSerializer
-    #permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
@@ -55,7 +55,7 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
 class VentanillaViewSet(viewsets.ModelViewSet):
     queryset = Ventanila.objects.all()
     serializer_class = VentanillaSerializer
-    #permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
@@ -77,7 +77,7 @@ class VentanillaViewSet(viewsets.ModelViewSet):
 class TurnoViewSet(viewsets.ModelViewSet):
     queryset = Turno.objects.all()
     serializer_class = TurnoSerializer
-    #permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     # Sobreescribimos metodo create, para completar automaticámente el valor de los 3 atributos(fecha_turno, estado y turno) cuando se cree un nuevo registro de turno
     def create(self, request, *args, **kwargs):
@@ -258,7 +258,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
 class AtencionViewSet(viewsets.ModelViewSet):
     queryset = Atencion.objects.all()
     serializer_class = AtencionSerializer
-    #permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
@@ -277,10 +277,42 @@ class AtencionViewSet(viewsets.ModelViewSet):
                 "message": "Ocurrió un error inesperado: " + str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)    
 
+    # ENDPOINT PARA LISTAR LOS ULTIMOS 6 REGISTROS DE ATENCION DEL DIA ACTUAL
+    @action(detail=False, methods=['get'], url_path='ultimas-6')
+    def ultimas_6(self, request):
+        try:
+            hoy = localtime(now()).date()
+            atenciones = Atencion.objects.filter(
+                fecha_atencion__date=hoy
+            ).select_related('id_turno__id_usuario', 'id_turno__estado', 'id_ventanilla').order_by('-fecha_atencion')[:6]
+
+            resultado = []
+            for atencion in atenciones:
+                turno = atencion.id_turno
+                usuario = turno.id_usuario if turno else None
+                ventanilla = atencion.id_ventanilla if atencion else None
+
+                resultado.append({
+                    'turno': turno.turno if turno else None,
+                    'estado': turno.estado.nombre if turno and turno.estado else None,
+                    'fecha_atencion': localtime(atencion.fecha_atencion),
+                    'id_ventanilla': atencion.id_ventanilla.id if atencion.id_ventanilla else None,
+                    'ventanilla': ventanilla.nombre if ventanilla else None,
+                    'nombres': usuario.nombres if usuario else None,
+                    'apellidos': usuario.apellidos if usuario else None,
+                })
+
+            return Response(resultado)
+        except TypeError as e:
+            return Response({
+                "success": False,
+                "message": f"Error de serialización: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class PuestoViewSet(viewsets.ModelViewSet):
     queryset = Puesto.objects.all()
     serializer_class = PuestoSerializer
-    #permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
@@ -301,7 +333,7 @@ class PuestoViewSet(viewsets.ModelViewSet):
 
 #  API VIEW USUARIO AUTENTICADO
 class UsuarioActualView(APIView):
-    #permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         Usuario = request.user
