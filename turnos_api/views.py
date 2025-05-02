@@ -7,13 +7,14 @@ from django.shortcuts import render
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno
-from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer
+from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer
 from .utils import handle_custom_exception
 from .exceptions import CustomAPIException
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from django.utils.timezone import now, localtime
 from django.db.models import Count
 from datetime import datetime, timedelta
+from rest_framework.generics import ListAPIView
 
 # UTILIDAD MOVER POSTERIORMENTE A SU PROPIO FICHERO
 
@@ -324,3 +325,48 @@ class UsuarioActualView(APIView):
         serializer = UsuarioAutenticadoSerializer(Usuario)
         return Response(serializer.data)
     
+# CREAR VISTA PARA LISTAR TIPO DE TRAMITES
+class TipoTramiteListView(ListAPIView):
+    queryset = TipoTramite.objects.all()
+    serializer_class = TipoTramiteSerializer
+    permission_classes = [AllowAny]
+
+    def list(self, request, *args, **kwargs):
+        try:
+            return handle_custom_exception(
+                self.get_queryset(),
+                TipoTramiteSerializer,
+                "La consulta ha sido exitosa",
+                "No se encontraron registros en la base de datos"
+            )
+        except CustomAPIException as e:
+            return Response(e.detail, status=e.status_code)
+
+        except Exception as e:
+            return Response({
+                "success": False,
+                "message": "Ocurrió un error inesperado: " + str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# CREAR VISTA PARA LISTAR LOS TIPOS DE TURNOS
+class TipoTurnoListView(ListAPIView):
+    queryset = TipoTurno.objects.all()
+    serializer_class = TipoTurnoSerializer
+    permission_classes = [AllowAny]
+
+    def list(self, request, *args, **kwargs):
+        try:
+            return handle_custom_exception(
+                self.get_queryset(),
+                TipoTurnoSerializer,
+                "La consulta ha sido exitosa",
+                "No se encontraron registros en la base de datos"
+            )
+        except CustomAPIException as e:
+            return Response(e.detail, status=e.status_code)
+
+        except Exception as e:
+            return Response({
+                "success": False,
+                "message": "Ocurrió un error inesperado: " + str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from.models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto
+from.models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno
 
 class FuncionarioSerializer(serializers.ModelSerializer):
     class Meta:
@@ -36,4 +36,14 @@ class PuestoSerializer(serializers.ModelSerializer):
 class UsuarioAutenticadoSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
+        fields = '__all__'
+
+class TipoTurnoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TipoTurno
+        fields = '__all__'
+
+class TipoTramiteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TipoTramite
         fields = '__all__'
