@@ -14,18 +14,24 @@ class VentanillaSerializer(serializers.ModelSerializer):
 
 class TurnoSerializer(serializers.ModelSerializer):
     tipo_tramite_nombre = serializers.CharField(source='tipo_tramite.nombre', read_only=True)
+    tipo_turno_nombre = serializers.CharField(source='tipo_turno.nombre', read_only=True)
+    nombre_usuario = serializers.CharField(source='id_usuario.nombres', read_only=True)
+    apellido_usuario = serializers.CharField(source='id_usuario.apellidos', read_only=True)
 
     class Meta:
         model = Turno
         fields = [
             'id',
             'id_usuario',
+            'nombre_usuario',
+            'apellido_usuario',
             'turno',
             'tipo_turno',
+            'tipo_turno_nombre',
             'estado',
             'tipo_tramite',
-            'fecha_turno',
             'tipo_tramite_nombre',
+            'fecha_turno',
         ]
 
 
