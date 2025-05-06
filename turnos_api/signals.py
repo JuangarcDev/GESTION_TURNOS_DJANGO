@@ -8,6 +8,7 @@ from django.dispatch import receiver
 from django.db import connection
 from .models import TipoTurno, EstadoTurno, TipoTramite, EstadoVentanilla
 
+
 def reset_sequence(model):
     table_name = model._meta.db_table
     sequence_sql = "ALTER SEQUENCE %s_id_seq RESTART WITH 1;" % table_name
