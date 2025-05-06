@@ -8,8 +8,10 @@ from django.contrib.auth.models import User, AbstractBaseUser
 class TipoTurno(models.Model):
     nombre = models.CharField(max_length=50, unique=True)
     abreviado = models.CharField(max_length=10, default='', blank=True)
-    tiempo_espera = models.IntegerField(max_length=3, default=0, blank=True)
-    
+    tiempo_espera = models.IntegerField(default=0, blank=True)
+    # visuales
+    icono = models.CharField(max_length=100, default='', blank=True, null=True)
+    color = models.CharField(max_length=100, default='', blank=True, null=True)
     def __str__(self):
         return self.nombre
     
@@ -22,8 +24,10 @@ class EstadoTurno(models.Model):
 class TipoTramite(models.Model):
     nombre = models.CharField(max_length=50, unique=True)
     abreviado = models.CharField(max_length=10, default='', blank=True)
-    tiempo_espera = models.IntegerField(max_length=3, default=0, blank=True)
-
+    tiempo_espera = models.IntegerField(default=0, blank=True)
+    # visuales
+    icono = models.CharField(max_length=100, default='', blank=True, null=True)
+    color = models.CharField(max_length=100, default='', blank=True, null=True)
     def __str__(self):
         return self.nombre
     

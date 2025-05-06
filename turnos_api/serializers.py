@@ -18,6 +18,8 @@ class TurnoSerializer(serializers.ModelSerializer):
     nombre_usuario = serializers.CharField(source='id_usuario.nombres', read_only=True)
     apellido_usuario = serializers.CharField(source='id_usuario.apellidos', read_only=True)
     cedula_usuario = serializers.CharField(source='id_usuario.cedula', read_only=True)
+    tramite_color = serializers.CharField(source='tipo_tramite.color', read_only=True)
+    tipo_turno_color = serializers.CharField(source='tipo_turno.color', read_only=True)
 
     class Meta:
         model = Turno
@@ -34,6 +36,8 @@ class TurnoSerializer(serializers.ModelSerializer):
             'tipo_tramite_nombre',
             'fecha_turno',
             'cedula_usuario',
+            'tramite_color',
+            'tipo_turno_color',
         ]
 
 
