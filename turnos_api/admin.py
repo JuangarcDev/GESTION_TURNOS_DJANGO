@@ -58,16 +58,13 @@ class TurnoAdmin(admin.ModelAdmin):
 
 @admin.register(Funcionario)
 class FuncionarioAdmin(admin.ModelAdmin):
-    list_display = ('usuario', 'nombre', 'telefono', 'email', 'fecha_creacion', 'fecha_edicion')
-    search_fields = ('usuario', 'nombre', 'email')
-    ordering = ('usuario',)
+    list_display = ('user', 'telefono', 'fecha_creacion', 'fecha_edicion')
+    search_fields = ('user', 'telefono')
+    ordering = ('user',)
     readonly_fields = ('fecha_creacion', 'fecha_edicion')
     fieldsets = (
-        ('Información de Acceso', {
-            'fields': ('usuario', 'password')
-        }),
         ('Datos Personales', {
-            'fields': ('nombre', 'telefono', 'email')
+            'fields': ('user', 'telefono')
         }),
         ('Fechas', {
             'fields': ('fecha_creacion', 'fecha_edicion')
@@ -77,7 +74,7 @@ class FuncionarioAdmin(admin.ModelAdmin):
 @admin.register(Atencion)
 class AtencionAdmin(admin.ModelAdmin):
     list_display = ('id_turno', 'id_funcionario', 'fecha_atencion')
-    search_fields = ('id_turno__turno', 'id_funcionario__nombre')
+    search_fields = ('id_turno__turno', 'id_funcionario__user')
     list_filter = ('fecha_atencion',)
     ordering = ('-fecha_atencion',)
     readonly_fields = ('fecha_atencion',)
@@ -92,7 +89,7 @@ class VentanilaAdmin(admin.ModelAdmin):
 @admin.register(Puesto)
 class PuestoAdmin(admin.ModelAdmin):
     list_display = ('id_funcionario', 'id_ventanilla', 'fecha_ingreso', 'fecha_salida')
-    search_fields = ('id_funcionario__nombre', 'id_ventanilla__nombre')
+    search_fields = ('id_funcionario__user', 'id_ventanilla__nombre')
     list_filter = ('fecha_ingreso', 'fecha_salida')
     ordering = ('-fecha_ingreso',)
     readonly_fields = ('fecha_ingreso',)

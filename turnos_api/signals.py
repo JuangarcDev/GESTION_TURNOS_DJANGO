@@ -1,13 +1,11 @@
-from django.db.models.signals import post_migrate
+from django.db.models.signals import post_migrate, post_save, m2m_changed
 from django.dispatch import receiver
 from django.db import connection
-from .models import TipoTurno, EstadoTurno, TipoTramite, EstadoVentanilla
-
+from .models import TipoTurno, EstadoTurno, TipoTramite, EstadoVentanilla, Funcionario
 from django.db.models.signals import post_migrate
-from django.dispatch import receiver
 from django.db import connection
-from .models import TipoTurno, EstadoTurno, TipoTramite, EstadoVentanilla
-
+# IMPORTACIONES PARA AUTH
+from django.contrib.auth.models import User, Group
 
 def reset_sequence(model):
     table_name = model._meta.db_table
@@ -61,3 +59,28 @@ def poblar_tablas_dominio(sender, **kwargs):
         estados_ventanilla = ["Libre", "Ocupada", "Fuera de Servicio", "Otro"]
         for estado_v in estados_ventanilla:
             EstadoVentanilla.objects.get_or_create(nombre=estado_v)
+
+@receiver(post_save, sender=User)
+def crear_funcionario_automaticamente(sender, instance, created, **kwargs):
+    print(f"🧪 Señal activada - Usuario: {instance.username}, created: {created}")
+    if created:
+        try:
+            grupo_ventanilla = Group.objects.get(name='Ventanillas')
+            print(f"➡️ ¿Usuario en grupo Ventanillas?: {grupo_ventanilla in instance.groups.all()}")
+            if grupo_ventanilla in instance.groups.all():
+                if not Funcionario.objects.filter(user=instance).exists():
+                    Funcionario.objects.create(user=instance)
+                    print("✅ Funcionario creado.")
+        except Group.DoesNotExist:
+            print("❌ Grupo 'Ventanillas' no existe")
+
+@receiver(m2m_changed, sender=User.groups.through)
+def crear_funcionario_si_ventanilla(sender, instance, action, pk_set, **kwargs):
+    if action == "post_add":
+        grupo_ventanilla = Group.objects.filter(name="Ventanillas").first()
+        if grupo_ventanilla and grupo_ventanilla.pk in pk_set:
+            if not Funcionario.objects.filter(user=instance).exists():
+                Funcionario.objects.create(user=instance)
+                print(f"✅ Funcionario creado automáticamente para el usuario: {instance.username}")
+            else:
+                print(f"ℹ️ El usuario {instance.username} ya tiene un Funcionario asignado.")

@@ -67,16 +67,13 @@ class Turno(models.Model):
         return f"Turno {self.turno} - {self.estado.nombre}"
     
 class Funcionario(models.Model):
-    usuario = models.CharField(max_length=50, unique=True)
-    password = models.CharField(max_length=255)
-    nombre = models.CharField(max_length=100)
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
     telefono = models.CharField(max_length=10, blank=True, null=True)
-    email = models.EmailField(max_length=100, blank=True, null=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_edicion = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.nombre
+        return self.user.get_full_name() or self.user.username
        
 class Ventanila(models.Model):
     nombre = models.CharField(max_length=50, unique=True)
@@ -94,7 +91,7 @@ class Atencion(models.Model):
     fecha_atencion = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Atención de {self.id_turno.turno} por {self.id_funcionario.nombre}"
+        return f"Atención de {self.id_turno.turno} por {self.id_funcionario.user.get_full_name()}"
  
     
 class Puesto(models.Model):
@@ -104,5 +101,5 @@ class Puesto(models.Model):
     fecha_salida = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.id_funcionario.nombre} - {self.id_ventanilla.nombre}"
+        return f"{self.id_funcionario.user.get_full_name()} - {self.id_ventanilla.nombre}"
     

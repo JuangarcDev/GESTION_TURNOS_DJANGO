@@ -46,7 +46,7 @@ INSTALLED_APPS = [
     # Framework documentacion Endpoints DRF Spectacular
     'drf_spectacular',
     # API de Turnos
-    'turnos_api',
+    'turnos_api.apps.TurnosApiConfig',
     # Graphviz
     'django_extensions',
     'corsheaders',
