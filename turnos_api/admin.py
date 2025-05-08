@@ -1,8 +1,18 @@
 from django.contrib import admin
 from .models import (
     TipoTurno, EstadoTurno, TipoTramite, EstadoVentanilla,
-    Usuario, Turno, Funcionario, Atencion, Ventanila, Puesto
+    Usuario, Turno, Funcionario, Atencion, Ventanila, Puesto, User
 )
+from django.contrib.auth.admin import UserAdmin
+
+class UserAdminCustom(UserAdmin):
+    model = User
+    list_display = ('username', 'email', 'is_staff', 'is_active')
+    filter_horizontal = ('groups',)  # Esto permitirá agregar/quitar grupos fácilmente
+
+# Desregistramos y volvemos a registrar el User con la nueva configuración
+admin.site.unregister(User)
+admin.site.register(User, UserAdminCustom)
 
 @admin.register(TipoTurno)
 class TipoTurnoAdmin(admin.ModelAdmin):
@@ -59,7 +69,7 @@ class TurnoAdmin(admin.ModelAdmin):
 @admin.register(Funcionario)
 class FuncionarioAdmin(admin.ModelAdmin):
     list_display = ('user', 'telefono', 'fecha_creacion', 'fecha_edicion')
-    search_fields = ('user', 'telefono')
+    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'telefono')
     ordering = ('user',)
     readonly_fields = ('fecha_creacion', 'fecha_edicion')
     fieldsets = (
@@ -70,6 +80,15 @@ class FuncionarioAdmin(admin.ModelAdmin):
             'fields': ('fecha_creacion', 'fecha_edicion')
         }),
     )
+
+    # Cuando un usuario se asigne al grupo "Ventanillas", se creará automáticamente el Funcionario
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        
+        # Verificar si el usuario tiene el grupo "Ventanillas" asignado
+        if "Ventanillas" in [group.name for group in obj.user.groups.all()]:
+            # Si el grupo "Ventanillas" está asignado, crear o actualizar el Funcionario
+            obj.save()
 
 @admin.register(Atencion)
 class AtencionAdmin(admin.ModelAdmin):
