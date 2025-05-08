@@ -33,12 +33,12 @@ def poblar_tablas_dominio(sender, **kwargs):
 
 
         # Poblar EstadoTurno
-        estados_turno = ["Espera", "Atención", "Atendido", "Cancelado"]
+        estados_turno = ["Pendiante", "En atención", "Finalizado", "Cancelado"]
         for estado in estados_turno:
             EstadoTurno.objects.get_or_create(nombre=estado)
 
         # Poblar TipoTramite con valores definidos
-        estados_turno = ["Espera", "Atención", "Atendido", "Cancelado"]
+        estados_turno = ["Pendiante", "En atención", "Finalizado", "Cancelado"]
         for estado in estados_turno:
             EstadoTurno.objects.get_or_create(nombre=estado)
 
