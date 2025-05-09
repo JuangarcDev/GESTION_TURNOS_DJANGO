@@ -485,7 +485,7 @@ def atender_turno(request, turno_id):
     except AuthenticationFailed:
         return Response({"error": "Token inválido o expirado."}, status=401)
 
-    print(f"Token recibido y verificado: {token}")  # Verificación en el log
+    #print(f"Token recibido y verificado: {token}")  # Verificación en el log
 
     puesto = Puesto.objects.filter(token=token, fecha_salida__isnull=True).first()
 
@@ -516,17 +516,27 @@ def atender_turno(request, turno_id):
 
 # ENPOINT PARA FINALIZAR ATENCION DE TURNO.
 @api_view(['POST'])
-def finalizar_turno(request):
+def finalizar_turno(request, turno_id):  # Cambio: agregamos turno_id en los parámetros de la vista
+    # Verificar si el token está presente en la cabecera
     token = request.headers.get('Authorization')
-    turno_id = request.data.get('id_turno')
+    if not token:
+        return Response({"error": "Token requerido."}, status=400)
 
-    if not token or not turno_id:
-        return Response({"error": "Token y turno_id son requeridos."}, status=400)
+    try:
+        # Extraemos el token del encabezado y verificamos su validez
+        token = token.split(' ')[1]
+        UntypedToken(token)  # Verifica que el token es válido
+    except IndexError:
+        return Response({"error": "Token mal formado."}, status=400)
+    except AuthenticationFailed:
+        return Response({"error": "Token inválido o expirado."}, status=401)
 
+    # Buscar el puesto asociado al token
     puesto = Puesto.objects.filter(token=token, fecha_salida__isnull=True).first()
     if not puesto:
         return Response({"error": "Token inválido o sesión terminada."}, status=401)
 
+    # Obtener el turno a partir del ID en la URL
     turno = get_object_or_404(Turno, id=turno_id)
     if turno.estado.nombre != "Atención":
         return Response({"error": "Este turno no está en atención actualmente."}, status=400)
@@ -536,6 +546,7 @@ def finalizar_turno(request):
     if not atencion:
         return Response({"error": "Este turno no está siendo atendido por usted."}, status=403)
 
+    # Cambiar el estado del turno a 'Atendido'
     estado_atendido = EstadoTurno.objects.get(nombre="Atendido")
     turno.estado = estado_atendido
     turno.save()

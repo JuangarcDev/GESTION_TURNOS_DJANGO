@@ -20,5 +20,5 @@ urlpatterns = [
     path('lista-ventanillas-estado/', VentanillaListView.as_view(), name='vetanilla_list'),
     path('asignar-ventanilla-puesto/', AsignarVentanillaView.as_view(), name='asignar_ventanilla'),
     path('atender-turno/<int:turno_id>/', atender_turno, name='atender_turno'),
-    path('finalizar-turno/', finalizar_turno, name='finalizar_turno'),
+    path('finalizar-turno/<int:turno_id>/', finalizar_turno, name='finalizar_turno'),
 ]
