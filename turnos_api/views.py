@@ -63,7 +63,7 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
                 "success": False,
                 "message": "Ocurrió un error inesperado: " + str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
 class VentanillaViewSet(viewsets.ModelViewSet):
     queryset = Ventanila.objects.all()
     serializer_class = VentanillaSerializer
@@ -160,7 +160,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
         turnos = Turno.objects.filter(estado_id=estado_id).order_by('fecha_turno')
         serializer = TurnoSerializer(turnos, many=True)
         return Response(serializer.data)
-    
+
     #ACA CREAREMOS EL ENDPOINT PARA BUSCAR POR EL NOMBRE Y OPCIONALMENTE UNA FECHA
     @extend_schema(
         parameters=[
@@ -188,7 +188,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
         turnos = turnos.order_by('fecha_turno')
         serializer = TurnoSerializer(turnos, many=True)
         return Response(serializer.data)
-    
+
     # NUEVO ENDPOINT PARA BUSCAR POR LA CEDULA DEL USUARIO
     @extend_schema(
         parameters=[
@@ -210,7 +210,6 @@ class TurnoViewSet(viewsets.ModelViewSet):
 
         serializer = TurnoSerializer(turnos, many=True)
         return Response(serializer.data)
-    
 
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
@@ -249,8 +248,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             'message': 'Usuario encontrado exitosamente.',
             'data': serializer.data
         }, status=status.HTTP_200_OK)
-    
-        
+
 class AtencionViewSet(viewsets.ModelViewSet):
     queryset = Atencion.objects.all()
     serializer_class = AtencionSerializer
