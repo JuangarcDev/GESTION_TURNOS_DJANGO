@@ -38,11 +38,6 @@ def poblar_tablas_dominio(sender, **kwargs):
             EstadoTurno.objects.get_or_create(nombre=estado)
 
         # Poblar TipoTramite con valores definidos
-        estados_turno = ["Pendiante", "En atención", "Finalizado", "Cancelado"]
-        for estado in estados_turno:
-            EstadoTurno.objects.get_or_create(nombre=estado)
-
-        # Poblar TipoTramite con valores definidos
         tramites = [
             {"id": 1, "nombre": "Producto Consulta", "abreviado": "P", "tiempo_espera": 25,"icono": "bi-search", "color": "#f39c12"},
             {"id": 2, "nombre": "Producto Emisión", "abreviado": "E", "tiempo_espera": 20,"icono": "bi-box-arrow-up", "color": "#27ae60"},

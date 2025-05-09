@@ -1,20 +1,26 @@
-from django.contrib.auth.models import User
-from rest_framework.decorators import action
+from django.contrib.auth.models import User, Group
+from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from django.utils.dateparse import parse_date
 from rest_framework.views import APIView
-from django.shortcuts import render
-from rest_framework import viewsets, status
+from django.shortcuts import render, get_object_or_404
+from rest_framework import viewsets, status, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno
-from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer
+from .models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla, EstadoTurno
+from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer, AsignarVentanillaSerializer, AtenderTurnoSerializer
 from .utils import handle_custom_exception
 from .exceptions import CustomAPIException
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from django.utils.timezone import now, localtime
 from django.db.models import Count
 from datetime import datetime, timedelta
 from rest_framework.generics import ListAPIView
+from rest_framework.exceptions import ValidationError, NotFound, APIException
+from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import UntypedToken
+from rest_framework.exceptions import AuthenticationFailed
+
+
 
 # UTILIDAD MOVER POSTERIORMENTE A SU PROPIO FICHERO
 
@@ -368,3 +374,179 @@ class TipoTurnoListView(ListAPIView):
                 "success": False,
                 "message": "Ocurrió un error inesperado: " + str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+# ENDPOINTS PARA EL LOGEO Y FUNCIONES GENERALES DEL USUARIO INTERNO
+# 0 Utilizar endpoint de TOKEN y posterior el de usuario actual
+# 1 LISTAR VENTANILLAS CON ESTADO
+
+class VentanillaListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        ventanillas = Ventanila.objects.all()
+        data = [{"id": v.id, "nombre": v.nombre, "estado": v.estado.nombre} for v in ventanillas]
+        return Response(data)
+
+# ENDPOINT PARA CREAR REGISTRO EN PUESTO Y ACTUALIZAR ESTADO DE VENTANILLA
+class ConflictError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = "Conflict occurred."
+    default_code = "conflict"
+
+
+@extend_schema(
+    request=AsignarVentanillaSerializer,
+    responses={
+        201: OpenApiTypes.OBJECT,
+        400: OpenApiTypes.OBJECT,
+        404: OpenApiTypes.OBJECT,
+        409: OpenApiTypes.OBJECT,
+    },
+    description="Asigna una ventanilla a un funcionario, creando un registro de puesto y cambiando el estado de la ventanilla a Ocupada."
+)
+class AsignarVentanillaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        funcionario_id = request.data.get("funcionario_id")
+        ventanilla_id = request.data.get("ventanilla_id")
+        confirmar = request.data.get("confirmar", False)
+
+        # Validación de parámetros obligatorios
+        if not funcionario_id or not ventanilla_id:
+            raise ValidationError({
+                "funcionario_id": "Este campo es obligatorio.",
+                "ventanilla_id": "Este campo es obligatorio."
+            })
+
+        # Validación de existencia del funcionario
+        try:
+            funcionario = Funcionario.objects.get(id=funcionario_id)
+        except Funcionario.DoesNotExist:
+            raise NotFound(detail=f"Funcionario con ID {funcionario_id} no encontrado.", code="funcionario_no_encontrado")
+
+        # Validación de existencia de la ventanilla
+        try:
+            ventanilla = Ventanila.objects.get(id=ventanilla_id)
+        except Ventanila.DoesNotExist:
+            raise NotFound(detail=f"Ventanilla con ID {ventanilla_id} no encontrada.", code="ventanilla_no_encontrada")
+
+        # Validación de ocupación de la ventanilla
+        if ventanilla.estado.nombre == "Ocupada" and not confirmar:
+            raise ConflictError(detail={
+                "message": "La ventanilla está actualmente ocupada. Debe confirmar si desea continuar.",
+                "require_confirm": True
+            })
+
+
+        # Obtener token del usuario autenticado
+        # Obtener token JWT desde el header
+        auth_header = request.headers.get('Authorization', '')
+        token_value = auth_header.split(' ')[1] if auth_header.startswith('Bearer ') else None
+
+        # Asignación del puesto con token
+        puesto = Puesto.objects.create(
+            id_funcionario=funcionario,
+            id_ventanilla=ventanilla,
+            token=token_value
+        )
+
+        # Cambio de estado de la ventanilla
+        try:
+            estado_ocupada = EstadoVentanilla.objects.get(nombre="Ocupada")
+        except EstadoVentanilla.DoesNotExist:
+            raise APIException(detail="El estado 'Ocupada' no está definido en el sistema.", code="estado_no_encontrado")
+
+        ventanilla.estado = estado_ocupada
+        ventanilla.save()
+
+        return Response({
+            "success": True,
+            "message": "Ventanilla asignada correctamente.",
+            "puesto_id": puesto.id,
+            "token": token_value
+        }, status=status.HTTP_201_CREATED)
+    
+# ENDPOINT PARA ATENDER TURNO. FUNCIONARIO - TOKEN - PUESTO
+@api_view(['POST'])
+def atender_turno(request, turno_id):
+    token = request.headers.get('Authorization')
+    if not token:
+        return Response({"error": "Token requerido."}, status=400)
+
+    try:
+        # Extraemos el token del encabezado
+        token = token.split(' ')[1]
+        UntypedToken(token)  # Verifica que el token es válido
+    except IndexError:
+        return Response({"error": "Token mal formado."}, status=400)
+    except AuthenticationFailed:
+        return Response({"error": "Token inválido o expirado."}, status=401)
+
+    #print(f"Token recibido y verificado: {token}")  # Verificación en el log
+
+    puesto = Puesto.objects.filter(token=token, fecha_salida__isnull=True).first()
+
+    if not puesto:
+        return Response({"error": "Token inválido o sesión terminada."}, status=401)
+
+    # Verificar si ya hay una atención activa del funcionario
+    if Atencion.objects.filter(id_funcionario=puesto.id_funcionario, id_turno__estado__nombre='Atención').exists():
+        return Response({"error": "Ya existe un turno en atención. Debe finalizarlo antes."}, status=400)
+
+    turno = get_object_or_404(Turno, id=turno_id)
+    if turno.estado.nombre != "Espera":
+        return Response({"error": "El turno no está disponible para ser atendido."}, status=400)
+
+    # Cambiar estado del turno a EN ATENCION
+    estado_en_atencion = EstadoTurno.objects.get(nombre="Atención")
+    turno.estado = estado_en_atencion
+    turno.save()
+
+    atencion = Atencion.objects.create(
+        id_funcionario=puesto.id_funcionario,
+        id_turno=turno,
+        id_ventanilla=puesto.id_ventanilla,
+        fecha_atencion=now()
+    )
+
+    return Response({"message": "Turno atendido con éxito", "atencion_id": atencion.id})
+
+# ENPOINT PARA FINALIZAR ATENCION DE TURNO.
+@api_view(['POST'])
+def finalizar_turno(request, turno_id):  # Cambio: agregamos turno_id en los parámetros de la vista
+    # Verificar si el token está presente en la cabecera
+    token = request.headers.get('Authorization')
+    if not token:
+        return Response({"error": "Token requerido."}, status=400)
+
+    try:
+        # Extraemos el token del encabezado y verificamos su validez
+        token = token.split(' ')[1]
+        UntypedToken(token)  # Verifica que el token es válido
+    except IndexError:
+        return Response({"error": "Token mal formado."}, status=400)
+    except AuthenticationFailed:
+        return Response({"error": "Token inválido o expirado."}, status=401)
+
+    # Buscar el puesto asociado al token
+    puesto = Puesto.objects.filter(token=token, fecha_salida__isnull=True).first()
+    if not puesto:
+        return Response({"error": "Token inválido o sesión terminada."}, status=401)
+
+    # Obtener el turno a partir del ID en la URL
+    turno = get_object_or_404(Turno, id=turno_id)
+    if turno.estado.nombre != "Atención":
+        return Response({"error": "Este turno no está en atención actualmente."}, status=400)
+
+    # Validar que el turno fue atendido por este funcionario
+    atencion = Atencion.objects.filter(id_turno=turno, id_funcionario=puesto.id_funcionario).first()
+    if not atencion:
+        return Response({"error": "Este turno no está siendo atendido por usted."}, status=403)
+
+    # Cambiar el estado del turno a 'Atendido'
+    estado_atendido = EstadoTurno.objects.get(nombre="Atendido")
+    turno.estado = estado_atendido
+    turno.save()
+
+    return Response({"message": "Turno finalizado correctamente."})
