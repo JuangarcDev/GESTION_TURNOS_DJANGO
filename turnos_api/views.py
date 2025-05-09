@@ -210,6 +210,43 @@ class TurnoViewSet(viewsets.ModelViewSet):
 
         serializer = TurnoSerializer(turnos, many=True)
         return Response(serializer.data)
+    
+    # ENDPOINT PARA BUSCAR POR ESTADO DE TURNO Y POSTERIOR POR TIPO DE TRAMITE:
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name='estado_id', required=False, type=int, location=OpenApiParameter.QUERY, description='ID del estado del turno (1 a 4)'),
+            OpenApiParameter(name='tipo_tramite_id', required=False, type=int, location=OpenApiParameter.QUERY, description='ID del tipo de trámite')
+        ]
+    )
+    @action(detail=False, methods=['get'], url_path='buscar-por-estado-tramite')
+    def buscar_por_estado_tramite(self, request):
+        estado_id = request.GET.get('estado_id')
+        tipo_tramite_id = request.GET.get('tipo_tramite_id', None)
+
+        # Validación de estado
+        try:
+            estado_id = int(estado_id)
+            if estado_id not in [1, 2, 3, 4]:
+                return Response({'error': 'Estado no válido. Valores permitidos: 1, 2, 3, 4.'}, status=400)
+        except (TypeError, ValueError):
+            return Response({'error': 'Debe proporcionar un estado_id válido (int).'}, status=400)
+
+        # Filtro base por estado
+        turnos = Turno.objects.filter(estado_id=estado_id)
+
+        # Filtro opcional por tipo de trámite
+        if tipo_tramite_id:
+            try:
+                tipo_tramite_id = int(tipo_tramite_id)
+                turnos = turnos.filter(tipo_tramite_id=tipo_tramite_id)
+            except ValueError:
+                return Response({'error': 'tipo_tramite_id debe ser un número entero.'}, status=400)
+
+        # Orden descendente por fecha_turno
+        turnos = turnos.order_by('-fecha_turno')
+
+        serializer = TurnoSerializer(turnos, many=True)
+        return Response(serializer.data)
 
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
