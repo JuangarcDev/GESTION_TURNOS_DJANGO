@@ -1,20 +1,22 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils.dateparse import parse_date
 from rest_framework.views import APIView
 from django.shortcuts import render
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno
-from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer
+from .models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla
+from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer, AsignarVentanillaSerializer
 from .utils import handle_custom_exception
 from .exceptions import CustomAPIException
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from django.utils.timezone import now, localtime
 from django.db.models import Count
 from datetime import datetime, timedelta
 from rest_framework.generics import ListAPIView
+from rest_framework.exceptions import ValidationError, NotFound, APIException
+
 
 # UTILIDAD MOVER POSTERIORMENTE A SU PROPIO FICHERO
 
@@ -370,3 +372,87 @@ class TipoTurnoListView(ListAPIView):
                 "success": False,
                 "message": "Ocurrió un error inesperado: " + str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+# ENDPOINTS PARA EL LOGEO Y FUNCIONES GENERALES DEL USUARIO INTERNO
+# 0 Utilizar endpoint de TOKEN y posterior el de usuario actual
+# 1 LISTAR VENTANILLAS CON ESTADO
+
+class VentanillaListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        ventanillas = Ventanila.objects.all()
+        data = [{"id": v.id, "nombre": v.nombre, "estado": v.estado.nombre} for v in ventanillas]
+        return Response(data)
+
+# ENDPOINT PARA CREAR REGISTRO EN PUESTO Y ACTUALIZAR ESTADO DE VENTANILLA
+class ConflictError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = "Conflict occurred."
+    default_code = "conflict"
+
+
+@extend_schema(
+    request=AsignarVentanillaSerializer,
+    responses={
+        201: OpenApiTypes.OBJECT,
+        400: OpenApiTypes.OBJECT,
+        404: OpenApiTypes.OBJECT,
+        409: OpenApiTypes.OBJECT,
+    },
+    description="Asigna una ventanilla a un funcionario, creando un registro de puesto y cambiando el estado de la ventanilla a Ocupada."
+)
+class AsignarVentanillaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        funcionario_id = request.data.get("funcionario_id")
+        ventanilla_id = request.data.get("ventanilla_id")
+        confirmar = request.data.get("confirmar", False)
+
+        # Validación de parámetros obligatorios
+        if not funcionario_id or not ventanilla_id:
+            raise ValidationError({
+                "funcionario_id": "Este campo es obligatorio.",
+                "ventanilla_id": "Este campo es obligatorio."
+            })
+
+        # Validación de existencia del funcionario
+        try:
+            funcionario = Funcionario.objects.get(id=funcionario_id)
+        except Funcionario.DoesNotExist:
+            raise NotFound(detail=f"Funcionario con ID {funcionario_id} no encontrado.", code="funcionario_no_encontrado")
+
+        # Validación de existencia de la ventanilla
+        try:
+            ventanilla = Ventanila.objects.get(id=ventanilla_id)
+        except Ventanila.DoesNotExist:
+            raise NotFound(detail=f"Ventanilla con ID {ventanilla_id} no encontrada.", code="ventanilla_no_encontrada")
+
+        # Validación de ocupación de la ventanilla
+        if ventanilla.estado.nombre == "Ocupada" and not confirmar:
+            raise ConflictError(detail={
+                "message": "La ventanilla está actualmente ocupada. Debe confirmar si desea continuar.",
+                "require_confirm": True
+            })
+
+        # Asignación del puesto
+        puesto = Puesto.objects.create(
+            id_funcionario=funcionario,
+            id_ventanilla=ventanilla
+        )
+
+        # Cambio de estado de la ventanilla
+        try:
+            estado_ocupada = EstadoVentanilla.objects.get(nombre="Ocupada")
+        except EstadoVentanilla.DoesNotExist:
+            raise APIException(detail="El estado 'Ocupada' no está definido en el sistema.", code="estado_no_encontrado")
+
+        ventanilla.estado = estado_ocupada
+        ventanilla.save()
+
+        return Response({
+            "success": True,
+            "message": "Ventanilla asignada correctamente.",
+            "puesto_id": puesto.id
+        }, status=status.HTTP_201_CREATED)

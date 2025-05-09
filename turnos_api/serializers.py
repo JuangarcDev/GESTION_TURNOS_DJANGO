@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from.models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno
+from.models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla
 
 class FuncionarioSerializer(serializers.ModelSerializer):
     class Meta:
@@ -77,9 +77,19 @@ class PuestoSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class UsuarioAutenticadoSerializer(serializers.ModelSerializer):
+    func_ventanilla = serializers.SerializerMethodField()
+    id_funcionario = serializers.CharField(source="funcionario.id", read_only=True)
     class Meta:
         model = User
-        fields = '__all__'
+        fields = ["id", 
+                  "username", 
+                  "first_name", 
+                  "last_name", 
+                  "func_ventanilla",
+                  "id_funcionario"]
+
+    def get_func_ventanilla(self, obj):
+        return obj.groups.filter(name="Ventanillas").exists()
 
 class TipoTurnoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -90,3 +100,14 @@ class TipoTramiteSerializer(serializers.ModelSerializer):
     class Meta:
         model = TipoTramite
         fields = '__all__'
+
+class EstadoVentanillaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EstadoVentanilla
+        fields = '__all__'
+
+# SERIALIZADOR PERSONALIZADO PARA ASIGNAR PUESTO:
+class AsignarVentanillaSerializer(serializers.Serializer):
+    funcionario_id = serializers.IntegerField()
+    ventanilla_id = serializers.IntegerField()
+    confirmar = serializers.BooleanField(required=False)
