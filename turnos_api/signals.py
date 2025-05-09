@@ -44,13 +44,14 @@ def poblar_tablas_dominio(sender, **kwargs):
 
         # Poblar TipoTramite con valores definidos
         tramites = [
-            {"id": 1, "nombre": "Producto Consulta", "abreviado": "P", "tiempo_espera": 25},
-            {"id": 2, "nombre": "Producto Emisión", "abreviado": "E", "tiempo_espera": 20},
-            {"id": 3, "nombre": "Tramite Consulta", "abreviado": "S", "tiempo_espera": 40},
-            {"id": 4, "nombre": "Tramite Radicacion", "abreviado": "T", "tiempo_espera": 25},
-            {"id": 5, "nombre": "Correspondencia", "abreviado": "C", "tiempo_espera": 20},
-            {"id": 6, "nombre": "Notificación", "abreviado": "N", "tiempo_espera": 20},
-            {"id": 7, "nombre": "Peticiones, Quejas o Reclamos", "abreviado": "R", "tiempo_espera": 30},
+            {"id": 1, "nombre": "Producto Consulta", "abreviado": "P", "tiempo_espera": 25,"icono": "bi-search", "color": "#f39c12"},
+            {"id": 2, "nombre": "Producto Emisión", "abreviado": "E", "tiempo_espera": 20,"icono": "bi-box-arrow-up", "color": "#27ae60"},
+            {"id": 3, "nombre": "Tramite Consulta", "abreviado": "S", "tiempo_espera": 40,"icono": "bi-chat-left-dots", "color": "#8e44ad"},
+            {"id": 4, "nombre": "Tramite Radicacion", "abreviado": "T", "tiempo_espera": 25,"icono": "bi-journal-check", "color": "#2980b9"},
+            {"id": 5, "nombre": "Correspondencia", "abreviado": "C", "tiempo_espera": 20,"icono": "bi-envelope-open","color": "#e74c3c"},
+            {"id": 6, "nombre": "Notificación", "abreviado": "N", "tiempo_espera": 20,"icono": "bi-bell-fill","color": "#1abc9c"},
+            {"id": 7, "nombre": "Peticiones, Quejas o Reclamos", "abreviado": "R", "tiempo_espera": 30,"icono": "bi-exclamation-circle-fill",
+        "color": "#d35400"},
         ]
         for tramite in tramites:
             TipoTramite.objects.create(**tramite)
