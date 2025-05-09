@@ -47,9 +47,29 @@ class UsuarioSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class AtencionSerializer(serializers.ModelSerializer):
+
+    turno = serializers.CharField(source='id_turno.turno', read_only=True)
+    estado = serializers.CharField(source='id_turno.estado.nombre', read_only=True)
+    nombres_usuario = serializers.CharField(source='id_turno.id_usuario.nombres', read_only=True)
+    apellidos_usuario = serializers.CharField(source='id_turno.id_usuario.apellidos', read_only=True)
+    ventanilla_nombre = serializers.CharField(source='id_ventanilla.nombre', read_only=True)
+    funcionario_nombre = serializers.CharField(source='id_funcionario.user.get_full_name', read_only=True)
+
     class Meta:
         model = Atencion
-        fields = '__all__'
+        fields = [
+            'id',
+            'fecha_atencion',
+            'turno',
+            'estado',
+            'nombres_usuario',
+            'apellidos_usuario',
+            'ventanilla_nombre',
+            'funcionario_nombre',
+            'id_turno',
+            'id_ventanilla',
+            'id_funcionario'
+        ]
 
 class PuestoSerializer(serializers.ModelSerializer):
     class Meta:

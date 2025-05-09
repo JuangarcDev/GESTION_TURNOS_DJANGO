@@ -50,8 +50,7 @@ def poblar_tablas_dominio(sender, **kwargs):
             {"id": 4, "nombre": "Tramite Radicacion", "abreviado": "T", "tiempo_espera": 25,"icono": "bi-journal-check", "color": "#2980b9"},
             {"id": 5, "nombre": "Correspondencia", "abreviado": "C", "tiempo_espera": 20,"icono": "bi-envelope-open","color": "#e74c3c"},
             {"id": 6, "nombre": "Notificación", "abreviado": "N", "tiempo_espera": 20,"icono": "bi-bell-fill","color": "#1abc9c"},
-            {"id": 7, "nombre": "Peticiones, Quejas o Reclamos", "abreviado": "R", "tiempo_espera": 30,"icono": "bi-exclamation-circle-fill",
-        "color": "#d35400"},
+            {"id": 7, "nombre": "Peticiones, Quejas o Reclamos", "abreviado": "R", "tiempo_espera": 30,"icono": "bi-exclamation-circle-fill","color": "#d35400"},
         ]
         for tramite in tramites:
             TipoTramite.objects.create(**tramite)
