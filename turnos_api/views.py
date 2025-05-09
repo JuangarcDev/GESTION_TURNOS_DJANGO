@@ -211,7 +211,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
         serializer = TurnoSerializer(turnos, many=True)
         return Response(serializer.data)
     
-    # ENDPOINT PARA BUSCAR POR ESTADO DE TURNO Y POSTERIOR POR TIPO DE TRAMITE:
+    # ENDPOINT PARA BUSCAR POR ESTADO DE TURNO Y POSTERIOR POR TIPO DE TRAMITE
     @extend_schema(
         parameters=[
             OpenApiParameter(name='estado_id', required=False, type=int, location=OpenApiParameter.QUERY, description='ID del estado del turno (1 a 4)'),
@@ -220,21 +220,23 @@ class TurnoViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['get'], url_path='buscar-por-estado-tramite')
     def buscar_por_estado_tramite(self, request):
-        estado_id = request.GET.get('estado_id')
+        estado_id = request.GET.get('estado_id', None)
         tipo_tramite_id = request.GET.get('tipo_tramite_id', None)
 
-        # Validación de estado
-        try:
-            estado_id = int(estado_id)
-            if estado_id not in [1, 2, 3, 4]:
-                return Response({'error': 'Estado no válido. Valores permitidos: 1, 2, 3, 4.'}, status=400)
-        except (TypeError, ValueError):
-            return Response({'error': 'Debe proporcionar un estado_id válido (int).'}, status=400)
+        # Inicializar la consulta base para todos los turnos
+        turnos = Turno.objects.all()
 
-        # Filtro base por estado
-        turnos = Turno.objects.filter(estado_id=estado_id)
+        # Filtrar por estado si se proporciona
+        if estado_id:
+            try:
+                estado_id = int(estado_id)
+                if estado_id not in [1, 2, 3, 4]:
+                    return Response({'error': 'Estado no válido. Valores permitidos: 1, 2, 3, 4.'}, status=400)
+                turnos = turnos.filter(estado_id=estado_id)
+            except (TypeError, ValueError):
+                return Response({'error': 'Debe proporcionar un estado_id válido (int).'}, status=400)
 
-        # Filtro opcional por tipo de trámite
+        # Filtrar por tipo de trámite si se proporciona
         if tipo_tramite_id:
             try:
                 tipo_tramite_id = int(tipo_tramite_id)
@@ -245,6 +247,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
         # Orden descendente por fecha_turno
         turnos = turnos.order_by('-fecha_turno')
 
+        # Serialización de los resultados
         serializer = TurnoSerializer(turnos, many=True)
         return Response(serializer.data)
 
