@@ -40,7 +40,6 @@ class TurnoSerializer(serializers.ModelSerializer):
             'tipo_turno_color',
         ]
 
-
 class UsuarioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Usuario
