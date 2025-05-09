@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from.models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla
+from.models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla, EstadoTurno
 
 class FuncionarioSerializer(serializers.ModelSerializer):
     class Meta:
@@ -106,8 +106,20 @@ class EstadoVentanillaSerializer(serializers.ModelSerializer):
         model = EstadoVentanilla
         fields = '__all__'
 
+class EstadoTurnoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EstadoTurno
+        fields = '__all__'
+
+
 # SERIALIZADOR PERSONALIZADO PARA ASIGNAR PUESTO:
 class AsignarVentanillaSerializer(serializers.Serializer):
     funcionario_id = serializers.IntegerField()
     ventanilla_id = serializers.IntegerField()
     confirmar = serializers.BooleanField(required=False)
+    # Este campo es opcional si solo lo asignas internamente
+    token = serializers.CharField(read_only=True)
+
+# SERIALIZADOR PERSONALIZADO PARA ATENDER TURNO
+class AtenderTurnoSerializer(serializers.Serializer):
+    id_turno = serializers.IntegerField(required=True)

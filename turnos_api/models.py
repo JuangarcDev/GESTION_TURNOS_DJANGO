@@ -99,6 +99,7 @@ class Puesto(models.Model):
     id_ventanilla = models.ForeignKey(Ventanila, on_delete=models.CASCADE, related_name="puestos")
     fecha_ingreso = models.DateTimeField(auto_now_add=True)
     fecha_salida = models.DateTimeField(blank=True, null=True)
+    token = models.CharField(max_length=255, blank=True, null=True, unique=True)  # NUEVO CAMPO
 
     def __str__(self):
         return f"{self.id_funcionario.user.get_full_name()} - {self.id_ventanilla.nombre}"
