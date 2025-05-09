@@ -18,9 +18,14 @@ from rest_framework.generics import ListAPIView
 from rest_framework.exceptions import ValidationError, NotFound, APIException
 from rest_framework.authtoken.models import Token
 from rest_framework_simplejwt.tokens import UntypedToken
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 from rest_framework.exceptions import AuthenticationFailed
-
-
+from rest_framework import status
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from jwt import decode as jwt_decode
+from django.conf import settings
+from django.utils import timezone
 
 # UTILIDAD MOVER POSTERIORMENTE A SU PROPIO FICHERO
 
@@ -551,4 +556,44 @@ def finalizar_turno(request, turno_id):  # Cambio: agregamos turno_id en los par
     turno.estado = estado_atendido
     turno.save()
 
+    # Registrar la fecha de finalización
+    atencion.fecha_fin_atencion = timezone.now()
+    atencion.save()
+
     return Response({"message": "Turno finalizado correctamente."})
+
+# ENDPOINT PARA HACER EL LOGOUT DE LA SESIÓN
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        auth_header = request.headers.get('Authorization', None)
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return Response({"detail": "Token no proporcionado."}, status=status.HTTP_400_BAD_REQUEST)
+
+        raw_token = auth_header.split(' ')[1]
+
+        # Paso 1: Obtener jti desde el token
+        try:
+            decoded = jwt_decode(raw_token, settings.SIMPLE_JWT['SIGNING_KEY'], algorithms=["HS256"])
+            jti = decoded.get("jti")
+        except Exception as e:
+            return Response({"detail": "Token inválido o mal formado."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Paso 2: Invalidar el token en el blacklist
+        try:
+            token_obj = OutstandingToken.objects.get(jti=jti)
+            BlacklistedToken.objects.get_or_create(token=token_obj)
+        except OutstandingToken.DoesNotExist:
+            return Response({"detail": "Token no encontrado en OutstandingToken."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Paso 3: Cerrar el puesto asociado a ese token
+        try:
+            puesto = Puesto.objects.get(token=raw_token, fecha_salida__isnull=True)
+            puesto.fecha_salida = now()
+            puesto.token = None  # limpiar el token si es necesario
+            puesto.save()
+        except Puesto.DoesNotExist:
+            return Response({"detail": "No se encontró un puesto activo con ese token."}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({"detail": "Sesión finalizada correctamente."}, status=status.HTTP_200_OK)

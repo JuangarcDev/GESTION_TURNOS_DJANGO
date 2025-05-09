@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import FuncionarioViewSet, VentanillaViewSet, TurnoViewSet, UsuarioViewSet, AtencionViewSet, PuestoViewSet, UsuarioActualView, TipoTramiteListView, TipoTurnoListView, VentanillaListView, AsignarVentanillaView, atender_turno, finalizar_turno
+from .views import FuncionarioViewSet, VentanillaViewSet, TurnoViewSet, UsuarioViewSet, AtencionViewSet, PuestoViewSet, UsuarioActualView, TipoTramiteListView, TipoTurnoListView, VentanillaListView, AsignarVentanillaView, atender_turno, finalizar_turno, LogoutView
 
 # Configuración de las rutas de la API
 router = DefaultRouter()
@@ -21,4 +21,5 @@ urlpatterns = [
     path('asignar-ventanilla-puesto/', AsignarVentanillaView.as_view(), name='asignar_ventanilla'),
     path('atender-turno/<int:turno_id>/', atender_turno, name='atender_turno'),
     path('finalizar-turno/<int:turno_id>/', finalizar_turno, name='finalizar_turno'),
+    path("logout/", LogoutView.as_view(), name="logout"),
 ]

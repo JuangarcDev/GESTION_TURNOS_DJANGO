@@ -16,45 +16,42 @@ def reset_sequence(model):
 @receiver(post_migrate)
 def poblar_tablas_dominio(sender, **kwargs):
     if sender.name == "turnos_api":
-        # LIMPIAR REGISTROS Y REINICIAR SECUENCIA DE ID
-        TipoTurno.objects.all().delete()
-        reset_sequence(TipoTurno)
+        print("🔄 Poblando tablas de dominio...")
 
-        TipoTramite.objects.all().delete()
-        reset_sequence(TipoTramite)
-
-        # Poblar TipoTurno
+        # Poblar TipoTurno (crear o actualizar)
         tipos_turno = [
             {"id": 1, "nombre": "Prioritario", "abreviado": "P", "tiempo_espera": 15},
             {"id": 2, "nombre": "General", "abreviado": "G", "tiempo_espera": 45},
         ]
         for tipo in tipos_turno:
-            TipoTurno.objects.create(**tipo)  # ahora sí insertamos con ID fijo
+            TipoTurno.objects.update_or_create(id=tipo["id"], defaults=tipo)
 
-
-        # Poblar EstadoTurno
+        # Poblar EstadoTurno (crear si no existe)
         estados_turno = ["Pendiante", "En atención", "Finalizado", "Cancelado"]
         for estado in estados_turno:
             EstadoTurno.objects.get_or_create(nombre=estado)
 
-        # Poblar TipoTramite con valores definidos
+        # Poblar TipoTramite (crear o actualizar)
         tramites = [
-            {"id": 1, "nombre": "Producto Consulta", "abreviado": "P", "tiempo_espera": 25,"icono": "bi-search", "color": "#f39c12"},
-            {"id": 2, "nombre": "Producto Emisión", "abreviado": "E", "tiempo_espera": 20,"icono": "bi-box-arrow-up", "color": "#27ae60"},
-            {"id": 3, "nombre": "Tramite Consulta", "abreviado": "S", "tiempo_espera": 40,"icono": "bi-chat-left-dots", "color": "#8e44ad"},
-            {"id": 4, "nombre": "Tramite Radicacion", "abreviado": "T", "tiempo_espera": 25,"icono": "bi-journal-check", "color": "#2980b9"},
-            {"id": 5, "nombre": "Correspondencia", "abreviado": "C", "tiempo_espera": 20,"icono": "bi-envelope-open","color": "#e74c3c"},
-            {"id": 6, "nombre": "Notificación", "abreviado": "N", "tiempo_espera": 20,"icono": "bi-bell-fill","color": "#1abc9c"},
-            {"id": 7, "nombre": "Peticiones, Quejas o Reclamos", "abreviado": "R", "tiempo_espera": 30,"icono": "bi-exclamation-circle-fill","color": "#d35400"},
+            {"id": 1, "nombre": "Producto Consulta", "abreviado": "P", "tiempo_espera": 25, "icono": "bi-search", "color": "#f39c12"},
+            {"id": 2, "nombre": "Producto Emisión", "abreviado": "E", "tiempo_espera": 20, "icono": "bi-box-arrow-up", "color": "#27ae60"},
+            {"id": 3, "nombre": "Tramite Consulta", "abreviado": "S", "tiempo_espera": 40, "icono": "bi-chat-left-dots", "color": "#8e44ad"},
+            {"id": 4, "nombre": "Tramite Radicacion", "abreviado": "T", "tiempo_espera": 25, "icono": "bi-journal-check", "color": "#2980b9"},
+            {"id": 5, "nombre": "Correspondencia", "abreviado": "C", "tiempo_espera": 20, "icono": "bi-envelope-open", "color": "#e74c3c"},
+            {"id": 6, "nombre": "Notificación", "abreviado": "N", "tiempo_espera": 20, "icono": "bi-bell-fill", "color": "#1abc9c"},
+            {"id": 7, "nombre": "Peticiones, Quejas o Reclamos", "abreviado": "R", "tiempo_espera": 30, "icono": "bi-exclamation-circle-fill", "color": "#d35400"},
         ]
         for tramite in tramites:
-            TipoTramite.objects.create(**tramite)
+            TipoTramite.objects.update_or_create(id=tramite["id"], defaults=tramite)
 
-        #Poblar EstadoVentanilla
+        # Poblar EstadoVentanilla (crear si no existe)
         estados_ventanilla = ["Libre", "Ocupada", "Fuera de Servicio", "Otro"]
         for estado_v in estados_ventanilla:
             EstadoVentanilla.objects.get_or_create(nombre=estado_v)
 
+        print("✅ Tablas de dominio pobladas exitosamente.")
+
+        
 @receiver(post_save, sender=User)
 def crear_funcionario_automaticamente(sender, instance, created, **kwargs):
     print(f"🧪 Señal activada - Usuario: {instance.username}, created: {created}")

@@ -89,6 +89,7 @@ class Atencion(models.Model):
     id_turno = models.OneToOneField(Turno, on_delete=models.CASCADE, related_name="atencion")
     id_ventanilla = models.ForeignKey(Ventanila, on_delete=models.PROTECT, related_name="atencion_ventanilla")
     fecha_atencion = models.DateTimeField(auto_now_add=True)
+    fecha_fin_atencion = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Atención de {self.id_turno.turno} por {self.id_funcionario.user.get_full_name()}"

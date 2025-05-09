@@ -25,11 +25,24 @@ SECRET_KEY = 'django-insecure-8(6($t!0iwh@@+5t8re*q4bt-8w0h0n#m!i#^1(k-w6xo0=%(b
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*', 'http://localhost:4200']
-CORS_ALLOW_ALL_ORIGINS = True
+ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:4200",
 ]
+
+#
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SIMPLE_JWT = {
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ROTATE_REFRESH_TOKENS': True,
+}
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -50,16 +63,13 @@ INSTALLED_APPS = [
     # Graphviz
     'django_extensions',
     'corsheaders',
+    # Para el vencimiento del TOKEN
+    'rest_framework_simplejwt.token_blacklist',
 ]
 
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-}
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -67,7 +77,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'backend.urls'
