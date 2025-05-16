@@ -39,11 +39,6 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
-SIMPLE_JWT = {
-    'BLACKLIST_AFTER_ROTATION': True,
-    'ROTATE_REFRESH_TOKENS': True,
-}
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -168,9 +163,11 @@ SPECTACULAR_SETTINGS = {
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=8),
     "REFRESH_TOKEN_LIFETIME": timedelta(hours=8),
-    "ROTATE_REFRESH_TOKENS": False,
     "BLACKLIST_AFTER_ROTATION": True,
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,
     "AUTH_HEADER_TYPES": ("Bearer",),
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ROTATE_REFRESH_TOKENS': True,
+    'UPDATE_LAST_LOGIN': True,
 }
