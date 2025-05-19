@@ -18,6 +18,13 @@ def poblar_tablas_dominio(sender, **kwargs):
     if sender.name == "turnos_api":
         print("🔄 Poblando tablas de dominio...")
 
+        # Crear grupo Ventanillas si no existe
+        grupo_ventanilla, creado = Group.objects.get_or_create(name="Ventanillas")
+        if creado:
+            print("✅ Grupo 'Ventanillas' creado automáticamente.")
+        else:
+            print("ℹ️ Grupo 'Ventanillas' ya existía.")
+
         # Poblar TipoTurno (crear o actualizar)
         tipos_turno = [
             {"id": 1, "nombre": "Prioritario", "abreviado": "P", "tiempo_espera": 15},
