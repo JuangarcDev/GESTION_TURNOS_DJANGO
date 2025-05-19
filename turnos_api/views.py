@@ -425,7 +425,7 @@ class TipoTurnoListView(ListAPIView):
 # 1 LISTAR VENTANILLAS CON ESTADO
 
 class VentanillaListView(APIView):
-    #permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         ventanillas = Ventanila.objects.all()
@@ -611,11 +611,12 @@ class LogoutView(APIView):
 
         raw_token = auth_header.split(' ')[1]
 
+        # Paso 1: Obtener jti desde el token
         try:
             # Paso 1: Decodificar el token para obtener el jti
             decoded = jwt_decode(raw_token, settings.SIMPLE_JWT['SIGNING_KEY'], algorithms=["HS256"])
             jti = decoded.get("jti")
-            
+
             # Paso 2: Intentar invalidar el token (manejar caso cuando no existe)
             token_obj, created = OutstandingToken.objects.get_or_create(
                 jti=jti,
@@ -626,20 +627,19 @@ class LogoutView(APIView):
                     'user_id': request.user.id
                 }
             )
-            
+
             BlacklistedToken.objects.get_or_create(token=token_obj)
 
         except Exception as e:
-            # Si hay error al decodificar, igual proceder con el logout
-            print(f"Error al procesar token: {str(e)}")
+            return Response({"detail": "Token inválido o mal formado."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Paso 3: Cerrar el puesto asociado (esto puede funcionar independientemente del token)
+        # Paso 3: Cerrar el puesto asociado a ese token
         try:
             puesto = Puesto.objects.get(token=raw_token, fecha_salida__isnull=True)
             puesto.fecha_salida = timezone.now()
-            puesto.token = None
+            puesto.token = None  # limpiar el token si es necesario
             puesto.save()
         except Puesto.DoesNotExist:
-            pass  # No hay puesto activo, continuar igual
-
+            puesto.token = None
+            
         return Response({"detail": "Sesión finalizada correctamente."}, status=status.HTTP_200_OK)
