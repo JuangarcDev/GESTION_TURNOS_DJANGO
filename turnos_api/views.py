@@ -590,7 +590,7 @@ def finalizar_turno(request, turno_id):  # Cambio: agregamos turno_id en los par
         return Response({"error": "Este turno no está siendo atendido por usted."}, status=403)
 
     # Cambiar el estado del turno a 'Atendido'
-    estado_atendido = EstadoTurno.objects.get(nombre="Atendido")
+    estado_atendido = EstadoTurno.objects.get(nombre="Finalizado")
     turno.estado = estado_atendido
     turno.save()
 
@@ -641,5 +641,5 @@ class LogoutView(APIView):
             puesto.save()
         except Puesto.DoesNotExist:
             puesto.token = None
-            
+
         return Response({"detail": "Sesión finalizada correctamente."}, status=status.HTTP_200_OK)
