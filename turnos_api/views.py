@@ -15,11 +15,10 @@ from django.utils.timezone import now, localtime
 from django.db.models import Count
 from datetime import datetime, timedelta
 from rest_framework.generics import ListAPIView
-from rest_framework.exceptions import ValidationError, NotFound, APIException
+from rest_framework.exceptions import ValidationError, NotFound, APIException, AuthenticationFailed
 from rest_framework.authtoken.models import Token
-from rest_framework_simplejwt.tokens import UntypedToken
+from rest_framework_simplejwt.tokens import UntypedToken, BlacklistedToken
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
-from rest_framework.exceptions import AuthenticationFailed
 from rest_framework import status
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -605,41 +604,54 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        auth_header = request.headers.get('Authorization', None)
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return Response({"detail": "Token no proporcionado."}, status=status.HTTP_400_BAD_REQUEST)
-
-        raw_token = auth_header.split(' ')[1]
-
-        # Paso 1: Obtener jti desde el token
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return Response({"error": "Token requerido."}, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
-            # Paso 1: Decodificar el token para obtener el jti
-            decoded = jwt_decode(raw_token, settings.SIMPLE_JWT['SIGNING_KEY'], algorithms=["HS256"])
-            jti = decoded.get("jti")
+            # Extraer token
+            token = auth_header.split(' ')[1]
+            untoken = UntypedToken(token)
+            jti = untoken['jti']
 
-            # Paso 2: Intentar invalidar el token (manejar caso cuando no existe)
-            token_obj, created = OutstandingToken.objects.get_or_create(
-                jti=jti,
-                defaults={
-                    'token': raw_token,
-                    'created_at': timezone.now(),
-                    'expires_at': datetime.fromtimestamp(decoded['exp'], timezone.utc),
-                    'user_id': request.user.id
-                }
-            )
+            # Validar token
+            UntypedToken(token)
 
-            BlacklistedToken.objects.get_or_create(token=token_obj)
+            # Blacklistear token
+            outstanding_token = OutstandingToken.objects.filter(token=token).first()
+            if not outstanding_token:
+                # Si no existe, crearlo
+                outstanding_token = OutstandingToken.objects.create(
+                    user=request.user,
+                    jti=jti,
+                    token=token,
+                    created_at=timezone.now(),
+                    expires_at=timezone.now() + timezone.timedelta(hours=12)  # o usa la expiración real del token
+                )
 
+            BlacklistedToken.objects.get_or_create(token=outstanding_token)
+
+            # Cerrar puesto
+            puesto = Puesto.objects.filter(token=token, fecha_salida__isnull=True).first()
+            if puesto:
+                puesto.fecha_salida = timezone.now()
+                puesto.token = None  # limpiar token si deseas
+                puesto.save()
+
+                # CAMBIAR EL ESTADO DE LA VENTANILLA A 'Libre'
+                try:
+                    estado_libre = EstadoVentanilla.objects.get(nombre="Libre")
+                    ventanilla = puesto.id_ventanilla
+                    ventanilla.estado = estado_libre
+                    ventanilla.save()
+                except EstadoVentanilla.DoesNotExist:
+                    return Response({"error": "El estado 'Libre' no está definido en el sistema."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)  
+
+            return Response({"message": "Sesión finalizada correctamente."}, status=status.HTTP_200_OK)
+
+        except IndexError:
+            return Response({"error": "Token mal formado."}, status=status.HTTP_400_BAD_REQUEST)
+        except AuthenticationFailed:
+            return Response({"error": "Token inválido o expirado."}, status=status.HTTP_401_UNAUTHORIZED)
         except Exception as e:
-            return Response({"detail": "Token inválido o mal formado."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Paso 3: Cerrar el puesto asociado a ese token
-        try:
-            puesto = Puesto.objects.get(token=raw_token, fecha_salida__isnull=True)
-            puesto.fecha_salida = timezone.now()
-            puesto.token = None  # limpiar el token si es necesario
-            puesto.save()
-        except Puesto.DoesNotExist:
-            puesto.token = None
-
-        return Response({"detail": "Sesión finalizada correctamente."}, status=status.HTTP_200_OK)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

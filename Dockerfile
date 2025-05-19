@@ -5,6 +5,11 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
+# VARIABLES DE ENTORNO PARA MANEJAR LAS ZH EN POSTGRESQL
+ENV TZ=America/Bogota
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+
 # Establecemos el directorio de trabajo
 WORKDIR /app
 
