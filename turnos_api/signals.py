@@ -34,7 +34,7 @@ def poblar_tablas_dominio(sender, **kwargs):
             TipoTurno.objects.update_or_create(id=tipo["id"], defaults=tipo)
 
         # Poblar EstadoTurno (crear si no existe)
-        estados_turno = ["Pendiante", "En atención", "Finalizado", "Cancelado"]
+        estados_turno = ["Espera", "Atención", "Finalizado", "Cancelado"]
         for estado in estados_turno:
             EstadoTurno.objects.get_or_create(nombre=estado)
 
