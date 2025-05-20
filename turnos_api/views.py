@@ -294,6 +294,12 @@ class AtencionViewSet(viewsets.ModelViewSet):
     serializer_class = AtencionSerializer
     permission_classes = [IsAuthenticated]
 
+    # AGREGAMOS QUE PARA EL ENDPOINT DE ULTIMAS 6, SEA ALLOWANY
+    def get_permissions(self):
+        if self.action == 'ultimas_6':
+            return [AllowAny()]
+        return super().get_permissions()
+
     def list(self, request, *args, **kwargs):
         try:
             return handle_custom_exception(
