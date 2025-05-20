@@ -1,7 +1,7 @@
 from django.db.models.signals import post_migrate, post_save, m2m_changed
 from django.dispatch import receiver
 from django.db import connection
-from .models import TipoTurno, EstadoTurno, TipoTramite, EstadoVentanilla, Funcionario
+from .models import TipoTurno, EstadoTurno, TipoTramite, EstadoVentanilla, Funcionario, Ventanila
 from django.db.models.signals import post_migrate
 from django.db import connection
 # IMPORTACIONES PARA AUTH
@@ -57,6 +57,22 @@ def poblar_tablas_dominio(sender, **kwargs):
             EstadoVentanilla.objects.get_or_create(nombre=estado_v)
 
         print("✅ Tablas de dominio pobladas exitosamente.")
+
+        #Poblar tabla de ventanillas inicialmente:
+        # Obtener el estado 'Libre'
+        estado_libre = EstadoVentanilla.objects.get(nombre='Libre')
+
+        # Crear ventanillas por defecto
+        for i in range(1, 6):
+            Ventanila.objects.update_or_create(
+                id=i,
+                defaults={
+                    'nombre': f'Ventanilla {i}',
+                    'estado': estado_libre
+                }
+            )
+
+        print("✅ Ventanillas por defecto creadas exitosamente.")
 
         
 @receiver(post_save, sender=User)
