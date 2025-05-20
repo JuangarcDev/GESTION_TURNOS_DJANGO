@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User, Group
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.utils.dateparse import parse_date
 from rest_framework.views import APIView
@@ -11,8 +11,8 @@ from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSeria
 from .utils import handle_custom_exception
 from .exceptions import CustomAPIException
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes, OpenApiExample
-from django.utils.timezone import now, localtime
-from django.db.models import Count
+from django.utils.timezone import now, localtime, make_aware
+from django.db.models import Count, Avg, F, ExpressionWrapper, DurationField
 from datetime import datetime, timedelta
 from rest_framework.generics import ListAPIView
 from rest_framework.exceptions import ValidationError, NotFound, APIException, AuthenticationFailed
@@ -24,6 +24,8 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from jwt import decode as jwt_decode
 from django.conf import settings
 from django.utils import timezone
+from django.db.models.functions import TruncDate
+#import pytz
 
 # UTILIDAD MOVER POSTERIORMENTE A SU PROPIO FICHERO
 
@@ -661,3 +663,74 @@ class LogoutView(APIView):
                 return Response({"error": "El estado 'Libre' no está definido en el sistema."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({"message": "Sesión cerrada correctamente."}, status=status.HTTP_200_OK)
+    
+# ENDPOINT CON ESTADISTICAS USUARIO VENTANILLA: CANTIDAD DIA, HISTORICO TURNOS ATENDIDOS. TIEMPO PROMEDIO ATENCION POR TURNO, DIA HISTORICO.
+class EstadisticasFuncionarioView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        # Verificar si es funcionario
+        try:
+            funcionario = Funcionario.objects.get(user=user)
+        except Funcionario.DoesNotExist:
+            return Response({'detail': 'El usuario no es un funcionario válido'}, status=403)
+
+        hoy = localtime(now()).date()
+
+        # Atenciones del día de hoy para este funcionario
+        atenciones_hoy = Atencion.objects.filter(
+            id_funcionario=funcionario,
+            fecha_atencion__date=hoy,
+            fecha_fin_atencion__isnull=False
+        )
+
+        # Conteo de trámites atendidos hoy
+        total_tramites_hoy = atenciones_hoy.count()
+
+        # Tiempo promedio de atención hoy (en minutos)
+        atenciones_hoy = atenciones_hoy.annotate(
+            duracion=ExpressionWrapper(
+                F('fecha_fin_atencion') - F('fecha_atencion'),
+                output_field=DurationField()
+            )
+        )
+        tiempo_promedio_hoy = atenciones_hoy.aggregate(
+            promedio=Avg('duracion')
+        )['promedio']
+        tiempo_promedio_hoy_min = round(tiempo_promedio_hoy.total_seconds() / 60, 2) if tiempo_promedio_hoy else 0
+
+        # Atenciones pasadas (anteriores a hoy)
+        atenciones_pasadas = Atencion.objects.filter(
+            id_funcionario=funcionario,
+            fecha_atencion__date__lt=hoy,
+            fecha_fin_atencion__isnull=False
+        ).annotate(
+            dia=TruncDate('fecha_atencion')
+        )
+
+        # Promedio de trámites por día (anteriores)
+        tramites_por_dia = atenciones_pasadas.values('dia').annotate(total=Count('id'))
+        total_dias = tramites_por_dia.count()
+        total_tramites_anteriores = sum(item['total'] for item in tramites_por_dia)
+        promedio_tramites_por_dia = round(total_tramites_anteriores / total_dias, 2) if total_dias else 0
+
+        # Tiempo promedio de atención por día en días anteriores
+        atenciones_pasadas = atenciones_pasadas.annotate(
+            duracion=ExpressionWrapper(
+                F('fecha_fin_atencion') - F('fecha_atencion'),
+                output_field=DurationField()
+            )
+        )
+        tiempo_promedio_anteriores = atenciones_pasadas.aggregate(
+            promedio=Avg('duracion')
+        )['promedio']
+        tiempo_promedio_anteriores_min = round(tiempo_promedio_anteriores.total_seconds() / 60, 2) if tiempo_promedio_anteriores else 0
+
+        return Response({
+            'Conteo_Tramites_Hoy': total_tramites_hoy,
+            'Promedio_Tramites_Dia_Historico': promedio_tramites_por_dia,
+            'Tiempo_Promedio_Atencion_Dia': tiempo_promedio_hoy_min,
+            'Tiempo_Promedio_Atencion_Historico': tiempo_promedio_anteriores_min
+        })

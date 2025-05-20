@@ -63,6 +63,7 @@ class AtencionSerializer(serializers.ModelSerializer):
     apellidos_usuario = serializers.CharField(source='id_turno.id_usuario.apellidos', read_only=True)
     ventanilla_nombre = serializers.CharField(source='id_ventanilla.nombre', read_only=True)
     funcionario_nombre = serializers.CharField(source='id_funcionario.user.get_full_name', read_only=True)
+    tiempo_atencion = serializers.SerializerMethodField()
 
     class Meta:
         model = Atencion
@@ -77,8 +78,16 @@ class AtencionSerializer(serializers.ModelSerializer):
             'funcionario_nombre',
             'id_turno',
             'id_ventanilla',
-            'id_funcionario'
+            'id_funcionario',
+            'fecha_fin_atencion',
+            'tiempo_atencion'
         ]
+
+    def get_tiempo_atencion(self, obj):
+        if obj.fecha_fin_atencion and obj.fecha_atencion:
+            delta = obj.fecha_fin_atencion - obj.fecha_atencion
+            return round(delta.total_seconds() / 60, 2)  # puedes convertir a minutos si prefieres
+        return None
 
 class PuestoSerializer(serializers.ModelSerializer):
     class Meta:
