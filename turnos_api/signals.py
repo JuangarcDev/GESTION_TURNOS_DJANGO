@@ -33,10 +33,18 @@ def poblar_tablas_dominio(sender, **kwargs):
         for tipo in tipos_turno:
             TipoTurno.objects.update_or_create(id=tipo["id"], defaults=tipo)
 
-        # Poblar EstadoTurno (crear si no existe)
-        estados_turno = ["Espera", "Atención", "Finalizado", "Cancelado"]
+        # Poblar EstadoTurno (crear o actualizar con ID fijo)
+        estados_turno = [
+            {"id": 1, "nombre": "Espera"},
+            {"id": 2, "nombre": "Atención"},
+            {"id": 3, "nombre": "Finalizado"},
+            {"id": 4, "nombre": "Cancelado"},
+        ]
+
         for estado in estados_turno:
-            EstadoTurno.objects.get_or_create(nombre=estado)
+            EstadoTurno.objects.update_or_create(
+                id=estado["id"], defaults={"nombre": estado["nombre"]}
+            )
 
         # Poblar TipoTramite (crear o actualizar)
         tramites = [
@@ -51,10 +59,18 @@ def poblar_tablas_dominio(sender, **kwargs):
         for tramite in tramites:
             TipoTramite.objects.update_or_create(id=tramite["id"], defaults=tramite)
 
-        # Poblar EstadoVentanilla (crear si no existe)
-        estados_ventanilla = ["Libre", "Ocupada", "Fuera de Servicio", "Otro"]
-        for estado_v in estados_ventanilla:
-            EstadoVentanilla.objects.get_or_create(nombre=estado_v)
+        # Poblar EstadoVentanilla (crear o actualizar con ID fijo)
+        estados_ventanilla = [
+            {"id": 1, "nombre": "Libre"},
+            {"id": 2, "nombre": "Ocupada"},
+            {"id": 3, "nombre": "Fuera de Servicio"},
+            {"id": 4, "nombre": "Otro"},
+        ]
+
+        for estado in estados_ventanilla:
+            EstadoVentanilla.objects.update_or_create(
+                id=estado["id"], defaults={"nombre": estado["nombre"]}
+            )
 
         print("✅ Tablas de dominio pobladas exitosamente.")
 
