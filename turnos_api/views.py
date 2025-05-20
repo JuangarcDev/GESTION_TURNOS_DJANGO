@@ -7,19 +7,18 @@ from django.shortcuts import render, get_object_or_404
 from rest_framework import viewsets, status, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla, EstadoTurno
-from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer, AsignarVentanillaSerializer, AtenderTurnoSerializer
+from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer, AsignarVentanillaSerializer, AtenderTurnoSerializer, LogoutSerializer
 from .utils import handle_custom_exception
 from .exceptions import CustomAPIException
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes, OpenApiExample
 from django.utils.timezone import now, localtime
 from django.db.models import Count
 from datetime import datetime, timedelta
 from rest_framework.generics import ListAPIView
 from rest_framework.exceptions import ValidationError, NotFound, APIException, AuthenticationFailed
 from rest_framework.authtoken.models import Token
-from rest_framework_simplejwt.tokens import UntypedToken, BlacklistedToken
-from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
-from rest_framework import status
+from rest_framework_simplejwt.tokens import UntypedToken, RefreshToken, TokenError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from jwt import decode as jwt_decode
@@ -29,7 +28,7 @@ from django.utils import timezone
 # UTILIDAD MOVER POSTERIORMENTE A SU PROPIO FICHERO
 
 def generar_nombre_turno(tipo_tramite_abrev, tipo_turno_abrev):
-    hoy = now().date()
+    hoy = localtime().date()
     contador = Turno.objects.filter(
         fecha_turno__date=hoy,
         tipo_tramite__abreviado=tipo_tramite_abrev,
@@ -102,7 +101,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
 
         # Obtener la hora actual como fecha_turno por defecto
         if 'fecha_turno' not in data or not data['fecha_turno']:
-            data['fecha_turno'] = now()
+            data['fecha_turno'] = localtime()
 
         # Estado del turno por defecto en espera
         if 'estado' not in data or not data['estado']:
@@ -551,7 +550,7 @@ def atender_turno(request, turno_id):
         id_funcionario=puesto.id_funcionario,
         id_turno=turno,
         id_ventanilla=puesto.id_ventanilla,
-        fecha_atencion=now()
+        fecha_atencion=localtime()
     )
 
     return Response({"message": "Turno atendido con éxito", "atencion_id": atencion.id})
@@ -599,59 +598,66 @@ def finalizar_turno(request, turno_id):  # Cambio: agregamos turno_id en los par
 
     return Response({"message": "Turno finalizado correctamente."})
 
-# ENDPOINT PARA HACER EL LOGOUT DE LA SESIÓN
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=LogoutSerializer,
+        responses={200: None, 400: None, 500: None},
+        summary="Cerrar sesión",
+        description="Recibe el token de refresh en el body para cerrar sesión e invalidar el token.",
+    )
     def post(self, request):
-        auth_header = request.headers.get('Authorization')
-        if not auth_header:
-            return Response({"error": "Token requerido."}, status=status.HTTP_400_BAD_REQUEST)
-        
+        # -------------------------
+        # 1. Invalidar Refresh Token
+        # -------------------------
+        serializer = LogoutSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        refresh_token = serializer.validated_data['refresh']
         try:
-            # Extraer token
-            token = auth_header.split(' ')[1]
-            untoken = UntypedToken(token)
-            jti = untoken['jti']
+            token = RefreshToken(refresh_token)
+            jti = token['jti']
 
-            # Validar token
-            UntypedToken(token)
-
-            # Blacklistear token
-            outstanding_token = OutstandingToken.objects.filter(token=token).first()
+            outstanding_token = OutstandingToken.objects.filter(jti=jti).first()
             if not outstanding_token:
-                # Si no existe, crearlo
-                outstanding_token = OutstandingToken.objects.create(
-                    user=request.user,
-                    jti=jti,
-                    token=token,
-                    created_at=timezone.now(),
-                    expires_at=timezone.now() + timezone.timedelta(hours=12)  # o usa la expiración real del token
-                )
+                return Response({"error": "Token no encontrado en Outstanding."}, status=status.HTTP_400_BAD_REQUEST)
 
             BlacklistedToken.objects.get_or_create(token=outstanding_token)
-
-            # Cerrar puesto
-            puesto = Puesto.objects.filter(token=token, fecha_salida__isnull=True).first()
-            if puesto:
-                puesto.fecha_salida = timezone.now()
-                puesto.token = None  # limpiar token si deseas
-                puesto.save()
-
-                # CAMBIAR EL ESTADO DE LA VENTANILLA A 'Libre'
-                try:
-                    estado_libre = EstadoVentanilla.objects.get(nombre="Libre")
-                    ventanilla = puesto.id_ventanilla
-                    ventanilla.estado = estado_libre
-                    ventanilla.save()
-                except EstadoVentanilla.DoesNotExist:
-                    return Response({"error": "El estado 'Libre' no está definido en el sistema."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)  
-
-            return Response({"message": "Sesión finalizada correctamente."}, status=status.HTTP_200_OK)
-
-        except IndexError:
-            return Response({"error": "Token mal formado."}, status=status.HTTP_400_BAD_REQUEST)
-        except AuthenticationFailed:
-            return Response({"error": "Token inválido o expirado."}, status=status.HTTP_401_UNAUTHORIZED)
+        except TokenError:
+            return Response({"error": "Refresh token inválido o ya expirado."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": f"Error al invalidar refresh token: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # -------------------------
+        # 2. Cerrar puesto y ventanilla con Access Token
+        # -------------------------
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return Response({"error": "Access token no proporcionado en el header."}, status=status.HTTP_400_BAD_REQUEST)
+
+        access_token = auth_header.split(' ')[1]
+        try:
+            UntypedToken(access_token)  # Verifica si el token es válido
+        except AuthenticationFailed:
+            return Response({"error": "Access token inválido o expirado."}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as e:
+            return Response({"error": f"Error al verificar access token: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Buscar puesto activo con ese access token
+        puesto = Puesto.objects.filter(token=access_token, fecha_salida__isnull=True).first()
+        if puesto:
+            puesto.fecha_salida = timezone.now()
+            puesto.token = None  # Limpia el token asociado
+            puesto.save()
+
+            try:
+                estado_libre = EstadoVentanilla.objects.get(nombre="Libre")
+                ventanilla = puesto.id_ventanilla
+                ventanilla.estado = estado_libre
+                ventanilla.save()
+            except EstadoVentanilla.DoesNotExist:
+                return Response({"error": "El estado 'Libre' no está definido en el sistema."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({"message": "Sesión cerrada correctamente."}, status=status.HTTP_200_OK)

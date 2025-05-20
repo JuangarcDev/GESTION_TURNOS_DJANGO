@@ -132,3 +132,7 @@ class AsignarVentanillaSerializer(serializers.Serializer):
 # SERIALIZADOR PERSONALIZADO PARA ATENDER TURNO
 class AtenderTurnoSerializer(serializers.Serializer):
     id_turno = serializers.IntegerField(required=True)
+
+# SERIALIZADOR PARA INVALIDAR EL TOKEN Y REALIZAR EL LOGGOUT
+class LogoutSerializer(serializers.Serializer):
+    refresh = serializers.CharField(help_text="Token de refresh que se va a invalidar")
