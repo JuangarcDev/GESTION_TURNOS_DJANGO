@@ -11,6 +11,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 
 # Establecemos el directorio de trabajo
+RUN mkdir /app
 WORKDIR /app
 
 # Instalamos dependencias del sistema necesarias
