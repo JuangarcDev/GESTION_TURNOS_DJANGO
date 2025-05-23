@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User, Group
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.utils.dateparse import parse_date
 from rest_framework.views import APIView
@@ -7,30 +7,30 @@ from django.shortcuts import render, get_object_or_404
 from rest_framework import viewsets, status, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla, EstadoTurno
-from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer, AsignarVentanillaSerializer, AtenderTurnoSerializer
+from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer, AsignarVentanillaSerializer, AtenderTurnoSerializer, LogoutSerializer
 from .utils import handle_custom_exception
 from .exceptions import CustomAPIException
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
-from django.utils.timezone import now, localtime
-from django.db.models import Count
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes, OpenApiExample
+from django.utils.timezone import now, localtime, make_aware
+from django.db.models import Count, Avg, F, ExpressionWrapper, DurationField
 from datetime import datetime, timedelta
 from rest_framework.generics import ListAPIView
-from rest_framework.exceptions import ValidationError, NotFound, APIException
+from rest_framework.exceptions import ValidationError, NotFound, APIException, AuthenticationFailed
 from rest_framework.authtoken.models import Token
-from rest_framework_simplejwt.tokens import UntypedToken
-from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
-from rest_framework.exceptions import AuthenticationFailed
-from rest_framework import status
+from rest_framework_simplejwt.tokens import UntypedToken, RefreshToken, TokenError
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from jwt import decode as jwt_decode
 from django.conf import settings
 from django.utils import timezone
+from django.db.models.functions import TruncDate
+#import pytz
 
 # UTILIDAD MOVER POSTERIORMENTE A SU PROPIO FICHERO
 
 def generar_nombre_turno(tipo_tramite_abrev, tipo_turno_abrev):
-    hoy = now().date()
+    hoy = localtime().date()
     contador = Turno.objects.filter(
         fecha_turno__date=hoy,
         tipo_tramite__abreviado=tipo_tramite_abrev,
@@ -103,7 +103,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
 
         # Obtener la hora actual como fecha_turno por defecto
         if 'fecha_turno' not in data or not data['fecha_turno']:
-            data['fecha_turno'] = now()
+            data['fecha_turno'] = localtime()
 
         # Estado del turno por defecto en espera
         if 'estado' not in data or not data['estado']:
@@ -293,6 +293,12 @@ class AtencionViewSet(viewsets.ModelViewSet):
     queryset = Atencion.objects.all()
     serializer_class = AtencionSerializer
     permission_classes = [IsAuthenticated]
+
+    # AGREGAMOS QUE PARA EL ENDPOINT DE ULTIMAS 6, SEA ALLOWANY
+    def get_permissions(self):
+        if self.action == 'ultimas_6':
+            return [AllowAny()]
+        return super().get_permissions()
 
     def list(self, request, *args, **kwargs):
         try:
@@ -552,7 +558,7 @@ def atender_turno(request, turno_id):
         id_funcionario=puesto.id_funcionario,
         id_turno=turno,
         id_ventanilla=puesto.id_ventanilla,
-        fecha_atencion=now()
+        fecha_atencion=localtime()
     )
 
     return Response({"message": "Turno atendido con éxito", "atencion_id": atencion.id})
@@ -590,7 +596,7 @@ def finalizar_turno(request, turno_id):  # Cambio: agregamos turno_id en los par
         return Response({"error": "Este turno no está siendo atendido por usted."}, status=403)
 
     # Cambiar el estado del turno a 'Atendido'
-    estado_atendido = EstadoTurno.objects.get(nombre="Atendido")
+    estado_atendido = EstadoTurno.objects.get(nombre="Finalizado")
     turno.estado = estado_atendido
     turno.save()
 
@@ -600,46 +606,137 @@ def finalizar_turno(request, turno_id):  # Cambio: agregamos turno_id en los par
 
     return Response({"message": "Turno finalizado correctamente."})
 
-# ENDPOINT PARA HACER EL LOGOUT DE LA SESIÓN
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=LogoutSerializer,
+        responses={200: None, 400: None, 500: None},
+        summary="Cerrar sesión",
+        description="Recibe el token de refresh en el body para cerrar sesión e invalidar el token.",
+    )
     def post(self, request):
-        auth_header = request.headers.get('Authorization', None)
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return Response({"detail": "Token no proporcionado."}, status=status.HTTP_400_BAD_REQUEST)
+        # -------------------------
+        # 1. Invalidar Refresh Token
+        # -------------------------
+        serializer = LogoutSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        raw_token = auth_header.split(' ')[1]
-
-        # Paso 1: Obtener jti desde el token
+        refresh_token = serializer.validated_data['refresh']
         try:
-            # Paso 1: Decodificar el token para obtener el jti
-            decoded = jwt_decode(raw_token, settings.SIMPLE_JWT['SIGNING_KEY'], algorithms=["HS256"])
-            jti = decoded.get("jti")
+            token = RefreshToken(refresh_token)
+            jti = token['jti']
 
-            # Paso 2: Intentar invalidar el token (manejar caso cuando no existe)
-            token_obj, created = OutstandingToken.objects.get_or_create(
-                jti=jti,
-                defaults={
-                    'token': raw_token,
-                    'created_at': timezone.now(),
-                    'expires_at': datetime.fromtimestamp(decoded['exp'], timezone.utc),
-                    'user_id': request.user.id
-                }
-            )
+            outstanding_token = OutstandingToken.objects.filter(jti=jti).first()
+            if not outstanding_token:
+                return Response({"error": "Token no encontrado en Outstanding."}, status=status.HTTP_400_BAD_REQUEST)
 
-            BlacklistedToken.objects.get_or_create(token=token_obj)
-
+            BlacklistedToken.objects.get_or_create(token=outstanding_token)
+        except TokenError:
+            return Response({"error": "Refresh token inválido o ya expirado."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({"detail": "Token inválido o mal formado."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": f"Error al invalidar refresh token: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Paso 3: Cerrar el puesto asociado a ese token
+        # -------------------------
+        # 2. Cerrar puesto y ventanilla con Access Token
+        # -------------------------
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return Response({"error": "Access token no proporcionado en el header."}, status=status.HTTP_400_BAD_REQUEST)
+
+        access_token = auth_header.split(' ')[1]
         try:
-            puesto = Puesto.objects.get(token=raw_token, fecha_salida__isnull=True)
+            UntypedToken(access_token)  # Verifica si el token es válido
+        except AuthenticationFailed:
+            return Response({"error": "Access token inválido o expirado."}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as e:
+            return Response({"error": f"Error al verificar access token: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Buscar puesto activo con ese access token
+        puesto = Puesto.objects.filter(token=access_token, fecha_salida__isnull=True).first()
+        if puesto:
             puesto.fecha_salida = timezone.now()
-            puesto.token = None  # limpiar el token si es necesario
+            puesto.token = None  # Limpia el token asociado
             puesto.save()
-        except Puesto.DoesNotExist:
-            puesto.token = None
-            
-        return Response({"detail": "Sesión finalizada correctamente."}, status=status.HTTP_200_OK)
+
+            try:
+                estado_libre = EstadoVentanilla.objects.get(nombre="Libre")
+                ventanilla = puesto.id_ventanilla
+                ventanilla.estado = estado_libre
+                ventanilla.save()
+            except EstadoVentanilla.DoesNotExist:
+                return Response({"error": "El estado 'Libre' no está definido en el sistema."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({"message": "Sesión cerrada correctamente."}, status=status.HTTP_200_OK)
+    
+# ENDPOINT CON ESTADISTICAS USUARIO VENTANILLA: CANTIDAD DIA, HISTORICO TURNOS ATENDIDOS. TIEMPO PROMEDIO ATENCION POR TURNO, DIA HISTORICO.
+class EstadisticasFuncionarioView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        # Verificar si es funcionario
+        try:
+            funcionario = Funcionario.objects.get(user=user)
+        except Funcionario.DoesNotExist:
+            return Response({'detail': 'El usuario no es un funcionario válido'}, status=403)
+
+        hoy = localtime(now()).date()
+
+        # Atenciones del día de hoy para este funcionario
+        atenciones_hoy = Atencion.objects.filter(
+            id_funcionario=funcionario,
+            fecha_atencion__date=hoy,
+            fecha_fin_atencion__isnull=False
+        )
+
+        # Conteo de trámites atendidos hoy
+        total_tramites_hoy = atenciones_hoy.count()
+
+        # Tiempo promedio de atención hoy (en minutos)
+        atenciones_hoy = atenciones_hoy.annotate(
+            duracion=ExpressionWrapper(
+                F('fecha_fin_atencion') - F('fecha_atencion'),
+                output_field=DurationField()
+            )
+        )
+        tiempo_promedio_hoy = atenciones_hoy.aggregate(
+            promedio=Avg('duracion')
+        )['promedio']
+        tiempo_promedio_hoy_min = round(tiempo_promedio_hoy.total_seconds() / 60, 2) if tiempo_promedio_hoy else 0
+
+        # Atenciones pasadas (anteriores a hoy)
+        atenciones_pasadas = Atencion.objects.filter(
+            id_funcionario=funcionario,
+            fecha_atencion__date__lt=hoy,
+            fecha_fin_atencion__isnull=False
+        ).annotate(
+            dia=TruncDate('fecha_atencion')
+        )
+
+        # Promedio de trámites por día (anteriores)
+        tramites_por_dia = atenciones_pasadas.values('dia').annotate(total=Count('id'))
+        total_dias = tramites_por_dia.count()
+        total_tramites_anteriores = sum(item['total'] for item in tramites_por_dia)
+        promedio_tramites_por_dia = round(total_tramites_anteriores / total_dias, 2) if total_dias else 0
+
+        # Tiempo promedio de atención por día en días anteriores
+        atenciones_pasadas = atenciones_pasadas.annotate(
+            duracion=ExpressionWrapper(
+                F('fecha_fin_atencion') - F('fecha_atencion'),
+                output_field=DurationField()
+            )
+        )
+        tiempo_promedio_anteriores = atenciones_pasadas.aggregate(
+            promedio=Avg('duracion')
+        )['promedio']
+        tiempo_promedio_anteriores_min = round(tiempo_promedio_anteriores.total_seconds() / 60, 2) if tiempo_promedio_anteriores else 0
+
+        return Response({
+            'Conteo_Tramites_Hoy': total_tramites_hoy,
+            'Promedio_Tramites_Dia_Historico': promedio_tramites_por_dia,
+            'Tiempo_Promedio_Atencion_Dia': tiempo_promedio_hoy_min,
+            'Tiempo_Promedio_Atencion_Historico': tiempo_promedio_anteriores_min
+        })

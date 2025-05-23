@@ -9,10 +9,10 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-
+import os
 from pathlib import Path
-
 from datetime import timedelta
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -26,18 +26,12 @@ SECRET_KEY = 'django-insecure-8(6($t!0iwh@@+5t8re*q4bt-8w0h0n#m!i#^1(k-w6xo0=%(b
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'db']
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:4200",
 ]
 
-#
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-}
 
 # Application definition
 
@@ -48,19 +42,20 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # Autenticación JWT
-    'rest_framework_simplejwt',
+
     # Framework para crear APIs
     'rest_framework',
+    # Autenticación JWT
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     # Framework documentacion Endpoints DRF Spectacular
     'drf_spectacular',
-    # API de Turnos
-    'turnos_api.apps.TurnosApiConfig',
     # Graphviz
     'django_extensions',
-    'corsheaders',
-    # Para el vencimiento del TOKEN
-    'rest_framework_simplejwt.token_blacklist',
+    'corsheaders', 
+
+    # API de Turnos
+    'turnos_api.apps.TurnosApiConfig',
 ]
 
 
@@ -99,17 +94,17 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+# Database
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'gestion_turnos_db',
-        'USER': 'postgres',
-        'PASSWORD': '1234jcgg',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': os.getenv('DB_NAME', 'gestion_turnos_db'),
+        'USER': os.getenv('DB_USER', 'postgres'),
+        'PASSWORD': os.getenv('DB_PASSWORD', '1234jcgg'),
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -152,6 +147,16 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# DRF
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+# DRF SPECTACULAR
+
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Gestion Turnos API',
     'DESCRIPTION': 'Una Aplicación para gestionar turnos, tanto generales como prioritarios y que permita apartar citas online',
@@ -160,14 +165,17 @@ SPECTACULAR_SETTINGS = {
     # OTHER SETTINGS
 }
 
+# JWT Settings
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=12),
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=8),
     "REFRESH_TOKEN_LIFETIME": timedelta(hours=12),
+    "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,
     "AUTH_HEADER_TYPES": ("Bearer",),
-    'BLACKLIST_AFTER_ROTATION': True,
-    'ROTATE_REFRESH_TOKENS': True,
-    'UPDATE_LAST_LOGIN': True,
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+    "TOKEN_BLACKLIST_ENABLED": True,
+    "UPDATE_LAST_LOGIN": True,
 }
+

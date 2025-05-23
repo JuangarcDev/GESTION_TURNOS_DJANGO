@@ -1,7 +1,7 @@
 from django.db.models.signals import post_migrate, post_save, m2m_changed
 from django.dispatch import receiver
 from django.db import connection
-from .models import TipoTurno, EstadoTurno, TipoTramite, EstadoVentanilla, Funcionario
+from .models import TipoTurno, EstadoTurno, TipoTramite, EstadoVentanilla, Funcionario, Ventanila
 from django.db.models.signals import post_migrate
 from django.db import connection
 # IMPORTACIONES PARA AUTH
@@ -18,6 +18,13 @@ def poblar_tablas_dominio(sender, **kwargs):
     if sender.name == "turnos_api":
         print("🔄 Poblando tablas de dominio...")
 
+        # Crear grupo Ventanillas si no existe
+        grupo_ventanilla, creado = Group.objects.get_or_create(name="Ventanillas")
+        if creado:
+            print("✅ Grupo 'Ventanillas' creado automáticamente.")
+        else:
+            print("ℹ️ Grupo 'Ventanillas' ya existía.")
+
         # Poblar TipoTurno (crear o actualizar)
         tipos_turno = [
             {"id": 1, "nombre": "Prioritario", "abreviado": "P", "tiempo_espera": 15},
@@ -26,10 +33,18 @@ def poblar_tablas_dominio(sender, **kwargs):
         for tipo in tipos_turno:
             TipoTurno.objects.update_or_create(id=tipo["id"], defaults=tipo)
 
-        # Poblar EstadoTurno (crear si no existe)
-        estados_turno = ["Pendiante", "En atención", "Finalizado", "Cancelado"]
+        # Poblar EstadoTurno (crear o actualizar con ID fijo)
+        estados_turno = [
+            {"id": 1, "nombre": "Espera"},
+            {"id": 2, "nombre": "Atención"},
+            {"id": 3, "nombre": "Finalizado"},
+            {"id": 4, "nombre": "Cancelado"},
+        ]
+
         for estado in estados_turno:
-            EstadoTurno.objects.get_or_create(nombre=estado)
+            EstadoTurno.objects.update_or_create(
+                id=estado["id"], defaults={"nombre": estado["nombre"]}
+            )
 
         # Poblar TipoTramite (crear o actualizar)
         tramites = [
@@ -44,12 +59,36 @@ def poblar_tablas_dominio(sender, **kwargs):
         for tramite in tramites:
             TipoTramite.objects.update_or_create(id=tramite["id"], defaults=tramite)
 
-        # Poblar EstadoVentanilla (crear si no existe)
-        estados_ventanilla = ["Libre", "Ocupada", "Fuera de Servicio", "Otro"]
-        for estado_v in estados_ventanilla:
-            EstadoVentanilla.objects.get_or_create(nombre=estado_v)
+        # Poblar EstadoVentanilla (crear o actualizar con ID fijo)
+        estados_ventanilla = [
+            {"id": 1, "nombre": "Libre"},
+            {"id": 2, "nombre": "Ocupada"},
+            {"id": 3, "nombre": "Fuera de Servicio"},
+            {"id": 4, "nombre": "Otro"},
+        ]
+
+        for estado in estados_ventanilla:
+            EstadoVentanilla.objects.update_or_create(
+                id=estado["id"], defaults={"nombre": estado["nombre"]}
+            )
 
         print("✅ Tablas de dominio pobladas exitosamente.")
+
+        #Poblar tabla de ventanillas inicialmente:
+        # Obtener el estado 'Libre'
+        estado_libre = EstadoVentanilla.objects.get(nombre='Libre')
+
+        # Crear ventanillas por defecto
+        for i in range(1, 6):
+            Ventanila.objects.update_or_create(
+                id=i,
+                defaults={
+                    'nombre': f'Ventanilla {i}',
+                    'estado': estado_libre
+                }
+            )
+
+        print("✅ Ventanillas por defecto creadas exitosamente.")
 
         
 @receiver(post_save, sender=User)
