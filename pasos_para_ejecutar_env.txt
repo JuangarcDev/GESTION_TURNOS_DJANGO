@@ -1,0 +1,24 @@
+python -m venv env
+# WINDOWS
+.\env\Scripts\activate
+# LINUX
+source env/bin/activate
+#INSTALAMOS REQUERIMIENTOS
+pip install --upgrade pip
+pip install -r requirements.txt
+
+#MIGRACIONES Y CREACION DE SUPER USER DE SER NECESARIO
+python manage.py makemigrations
+python manage.py migrate
+python manage.py createsuperuser
+
+#DESPLEGAR EL SERVIDOR
+python manage.py runserver
+
+#RUTAS DE ACCESO AL APLICATIVO
+# SWAGGER
+http://127.0.0.1:8000/api/schema/swagger-ui/#/
+# DJANGO ADMIN
+http://127.0.0.1:8000/admin/login/?next=/admin/
+# VISTA DRF
+http://127.0.0.1:8000/api/
