@@ -1,0 +1,51 @@
+Contenido ejemplo (.env):
+----------------------------
+DB_HOST=192.168.1.100
+DB_PORT=5432
+DB_NAME=nombre_de_tu_base
+DB_USER=usuario
+DB_PASSWORD=contraseña
+SECRET_KEY=clave_django_secreta
+----------------------------
+
+⚠️ Reemplaza los valores con los que estás usando actualmente.
+
+--------------------------------------------------
+2️⃣ ASEGÚRATE DE TENER REQUIREMENTS.TXT
+--------------------------------------------------
+
+Ejecuta desde tu entorno virtual (ya activado):
+
+```bash
+pip freeze > requirements.txt
+
+# CONSTRUIR LA IMAGEN DEL DOCKER
+docker-compose build
+
+# EJECUTAR LA IMAGEN DE LA APP CON EL DOCKER
+docker-compose up
+
+COMANDOS DE MIGRACION Y SUPERUSUARIO
+docker-compose exec backend python manage.py migrate
+docker-compose exec backend python manage.py createsuperuser
+
+🐚 Acceder al shell interactivo de Django:
+
+bash
+Copiar
+Editar
+docker-compose exec backend python manage.py shell
+🐳 Acceder a una terminal bash dentro del contenedor:
+
+bash
+Copiar
+Editar
+docker-compose exec backend bash
+🔁 Reconstruir todo desde cero si algo sale mal:
+
+bash
+Copiar
+Editar
+docker-compose down --volumes
+docker-compose build --no-cache
+docker-compose up
