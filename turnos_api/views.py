@@ -740,3 +740,49 @@ class EstadisticasFuncionarioView(APIView):
             'Tiempo_Promedio_Atencion_Dia': tiempo_promedio_hoy_min,
             'Tiempo_Promedio_Atencion_Historico': tiempo_promedio_anteriores_min
         })
+
+# ENDPOINT PARA CANCELAR TURNOS, SI EL TURNO NO ESTA EN ATENCION, PUEDE CANCELARLO CUALQUIER FUNCIONARIO, EN CASO DE QUE SE ENCUENTRE EN ATENCION UNICAMENTE LO PUEDE CANCELAR EL FUNCIONARIO QUE LO SOLICITO
+@api_view(['POST'])
+def cancelar_turno(request, turno_id):
+    # Verificar token
+    token = request.headers.get('Authorization')
+    if not token:
+        return Response({"error": "Token requerido."}, status=400)
+
+    try:
+        token = token.split(' ')[1]
+        UntypedToken(token)
+    except (IndexError, AuthenticationFailed):
+        return Response({"error": "Token inválido o expirado."}, status=401)
+
+    # Obtener puesto activo del funcionario
+    puesto = Puesto.objects.filter(token=token, fecha_salida__isnull=True).first()
+    if not puesto:
+        return Response({"error": "Token inválido o sesión terminada."}, status=401)
+
+    funcionario = puesto.id_funcionario
+
+    # Obtener el turno
+    turno = get_object_or_404(Turno, id=turno_id)
+
+    if turno.estado.nombre == "Espera":
+        # Cualquier funcionario puede cancelar
+        pass
+    elif turno.estado.nombre == "Atención":
+        # Verificamos que el turno esté siendo atendido por este funcionario
+        atencion = Atencion.objects.filter(id_turno=turno, id_funcionario=funcionario).first()
+        if not atencion:
+            return Response({"error": "No tiene permiso para cancelar este turno en atención."}, status=403)
+    else:
+        return Response({"error": f"No se puede cancelar un turno en estado '{turno.estado.nombre}'."}, status=400)
+
+    # Cambiar estado a "Cancelado"
+    estado_cancelado = EstadoTurno.objects.get(nombre="Cancelado")
+    turno.estado = estado_cancelado
+    turno.save()
+
+    # Registrar la fecha de finalización en este caso de cancelar
+    atencion.fecha_fin_atencion = timezone.now()
+    atencion.save()
+
+    return Response({"message": "Turno cancelado correctamente."}, status=200)
