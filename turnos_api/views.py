@@ -606,6 +606,8 @@ def finalizar_turno(request, turno_id):  # Cambio: agregamos turno_id en los par
 
     return Response({"message": "Turno finalizado correctamente."})
 
+#ENDPOINT DE LOGOUT
+
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 

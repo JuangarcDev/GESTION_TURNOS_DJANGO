@@ -68,6 +68,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'turnos_api.middleware.session_expiration.SessionExpirationMiddleware',
 ]
 
 ROOT_URLCONF = 'backend.urls'
