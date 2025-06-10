@@ -1,22 +1,37 @@
 from django.db.models.signals import post_migrate, post_save, m2m_changed
 from django.dispatch import receiver
-from django.db import connection
+from django.db import transaction, connection
 from .models import TipoTurno, EstadoTurno, TipoTramite, EstadoVentanilla, Funcionario, Ventanila
-from django.db.models.signals import post_migrate
-from django.db import connection
+
 # IMPORTACIONES PARA AUTH
 from django.contrib.auth.models import User, Group
 
-def reset_sequence(model):
+def reset_sequence(model, restart_from=None):
     table_name = model._meta.db_table
-    sequence_sql = "ALTER SEQUENCE %s_id_seq RESTART WITH 1;" % table_name
+    sequence_name = f"{table_name}_id_seq"
+
     with connection.cursor() as cursor:
-        cursor.execute(sequence_sql)
+        if restart_from is not None:
+            cursor.execute(f"ALTER SEQUENCE {sequence_name} RESTART WITH {restart_from};")
+        else:
+            cursor.execute(
+                f"SELECT setval('{sequence_name}', COALESCE((SELECT MAX(id) FROM {table_name}), 1), true);"
+            )
 
 @receiver(post_migrate)
 def poblar_tablas_dominio(sender, **kwargs):
-    if sender.name == "turnos_api":
-        print("🔄 Poblando tablas de dominio...")
+    if sender.name != "turnos_api":
+        return
+
+    with transaction.atomic():
+        print("🔄 Poblando tablas de dominio de forma segura...")
+
+        # Reiniciar secuencias ANTES de insertar con IDs fijos
+        reset_sequence(TipoTurno, restart_from=1)
+        reset_sequence(EstadoTurno, restart_from=1)
+        reset_sequence(TipoTramite, restart_from=1)
+        reset_sequence(EstadoVentanilla, restart_from=1)
+        reset_sequence(Ventanila, restart_from=1)
 
         # Crear grupo Ventanillas si no existe
         grupo_ventanilla, creado = Group.objects.get_or_create(name="Ventanillas")
@@ -25,7 +40,7 @@ def poblar_tablas_dominio(sender, **kwargs):
         else:
             print("ℹ️ Grupo 'Ventanillas' ya existía.")
 
-        # Poblar TipoTurno (crear o actualizar)
+        # Poblado con IDs fijos
         tipos_turno = [
             {"id": 1, "nombre": "Prioritario", "abreviado": "P", "tiempo_espera": 15},
             {"id": 2, "nombre": "General", "abreviado": "G", "tiempo_espera": 45},
@@ -33,20 +48,15 @@ def poblar_tablas_dominio(sender, **kwargs):
         for tipo in tipos_turno:
             TipoTurno.objects.update_or_create(id=tipo["id"], defaults=tipo)
 
-        # Poblar EstadoTurno (crear o actualizar con ID fijo)
         estados_turno = [
             {"id": 1, "nombre": "Espera"},
             {"id": 2, "nombre": "Atención"},
             {"id": 3, "nombre": "Finalizado"},
             {"id": 4, "nombre": "Cancelado"},
         ]
-
         for estado in estados_turno:
-            EstadoTurno.objects.update_or_create(
-                id=estado["id"], defaults={"nombre": estado["nombre"]}
-            )
+            EstadoTurno.objects.update_or_create(id=estado["id"], defaults={"nombre": estado["nombre"]})
 
-        # Poblar TipoTramite (crear o actualizar)
         tramites = [
             {"id": 1, "nombre": "Producto Consulta", "abreviado": "P", "tiempo_espera": 25, "icono": "bi-search", "color": "#f39c12"},
             {"id": 2, "nombre": "Producto Emisión", "abreviado": "E", "tiempo_espera": 20, "icono": "bi-box-arrow-up", "color": "#27ae60"},
@@ -59,26 +69,17 @@ def poblar_tablas_dominio(sender, **kwargs):
         for tramite in tramites:
             TipoTramite.objects.update_or_create(id=tramite["id"], defaults=tramite)
 
-        # Poblar EstadoVentanilla (crear o actualizar con ID fijo)
         estados_ventanilla = [
             {"id": 1, "nombre": "Libre"},
             {"id": 2, "nombre": "Ocupada"},
             {"id": 3, "nombre": "Fuera de Servicio"},
             {"id": 4, "nombre": "Otro"},
         ]
-
         for estado in estados_ventanilla:
-            EstadoVentanilla.objects.update_or_create(
-                id=estado["id"], defaults={"nombre": estado["nombre"]}
-            )
-
-        print("✅ Tablas de dominio pobladas exitosamente.")
-
-        #Poblar tabla de ventanillas inicialmente:
-        # Obtener el estado 'Libre'
-        estado_libre = EstadoVentanilla.objects.get(nombre='Libre')
+            EstadoVentanilla.objects.update_or_create(id=estado["id"], defaults={"nombre": estado["nombre"]})
 
         # Crear ventanillas por defecto
+        estado_libre = EstadoVentanilla.objects.get(nombre='Libre')
         for i in range(1, 6):
             Ventanila.objects.update_or_create(
                 id=i,
@@ -88,7 +89,14 @@ def poblar_tablas_dominio(sender, **kwargs):
                 }
             )
 
-        print("✅ Ventanillas por defecto creadas exitosamente.")
+        # Actualizar secuencias para que continúen desde el último ID
+        reset_sequence(TipoTurno)
+        reset_sequence(EstadoTurno)
+        reset_sequence(TipoTramite)
+        reset_sequence(EstadoVentanilla)
+        reset_sequence(Ventanila)
+
+        print("✅ Tablas de dominio y secuencias configuradas correctamente.")
 
         
 @receiver(post_save, sender=User)

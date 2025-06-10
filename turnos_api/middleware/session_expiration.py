@@ -19,7 +19,7 @@ class SessionExpirationMiddleware:
                 puesto = Puesto.objects.filter(token=token_str, fecha_salida__isnull=True).first()
 
                 if puesto:
-                    tiempo_maximo = timedelta(minutes=5)
+                    tiempo_maximo = timedelta(hours=10)
                     tiempo_sesion = timezone.now() - puesto.fecha_ingreso
 
                     if tiempo_sesion > tiempo_maximo:
