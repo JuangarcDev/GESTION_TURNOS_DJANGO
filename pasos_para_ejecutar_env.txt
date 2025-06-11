@@ -8,7 +8,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 #MIGRACIONES Y CREACION DE SUPER USER DE SER NECESARIO
-python manage.py makemigrations
+
 python manage.py migrate
 python manage.py createsuperuser
 

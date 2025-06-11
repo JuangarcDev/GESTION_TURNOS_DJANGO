@@ -22,6 +22,12 @@ class TurnoSerializer(serializers.ModelSerializer):
     tipo_turno_color = serializers.CharField(source='tipo_turno.color', read_only=True)
     tiempo_estimado_maximo = serializers.SerializerMethodField()
 
+    # NUEVOS CAMPOS
+    id_funcionario = serializers.SerializerMethodField()
+    nombre_funcionario = serializers.SerializerMethodField()
+    id_ventanilla = serializers.SerializerMethodField()
+    nombre_ventanilla = serializers.SerializerMethodField()
+
     class Meta:
         model = Turno
         fields = [
@@ -40,6 +46,11 @@ class TurnoSerializer(serializers.ModelSerializer):
             'cedula_usuario',
             'tramite_color',
             'tipo_turno_color',
+            # nuevos campos
+            'id_funcionario',
+            'nombre_funcionario',
+            'id_ventanilla',
+            'nombre_ventanilla',
         ]
 
     def get_tiempo_estimado_maximo(self, obj):
@@ -47,6 +58,23 @@ class TurnoSerializer(serializers.ModelSerializer):
             return 15
         elif obj.tipo_turno.id == 2:  # General
             return obj.tipo_tramite.tiempo_espera
+        return None
+
+    def get_id_funcionario(self, obj):
+        return obj.atencion.id_funcionario.id if hasattr(obj, 'atencion') else None
+
+    def get_nombre_funcionario(self, obj):
+        if hasattr(obj, 'atencion'):
+            funcionario = obj.atencion.id_funcionario
+            return funcionario.user.get_full_name() or funcionario.user.username
+        return None
+
+    def get_id_ventanilla(self, obj):
+        return obj.atencion.id_ventanilla.id if hasattr(obj, 'atencion') else None
+
+    def get_nombre_ventanilla(self, obj):
+        if hasattr(obj, 'atencion'):
+            return obj.atencion.id_ventanilla.nombre
         return None
 
 
