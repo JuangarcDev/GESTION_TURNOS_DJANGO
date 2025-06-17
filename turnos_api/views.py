@@ -7,10 +7,10 @@ from django.shortcuts import render, get_object_or_404
 from rest_framework import viewsets, status, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla, EstadoTurno
-from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer, AsignarVentanillaSerializer, AtenderTurnoSerializer, LogoutSerializer
+from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer, AsignarVentanillaSerializer, AtenderTurnoSerializer, LogoutSerializer, FinalizarTurnoResponseSerializer, ErrorResponseSerializer, EstadisticasFuncionarioSerializer
 from .utils import handle_custom_exception
 from .exceptions import CustomAPIException
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes, OpenApiExample
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes, OpenApiExample, OpenApiResponse, extend_schema_view
 from django.utils.timezone import now, localtime, make_aware
 from django.db.models import Count, Avg, F, ExpressionWrapper, DurationField
 from datetime import datetime, timedelta
@@ -372,6 +372,11 @@ class PuestoViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 #  API VIEW USUARIO AUTENTICADO
+@extend_schema_view(
+    get=extend_schema(
+        responses=UsuarioAutenticadoSerializer
+    )
+)
 class UsuarioActualView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -429,14 +434,17 @@ class TipoTurnoListView(ListAPIView):
 # ENDPOINTS PARA EL LOGEO Y FUNCIONES GENERALES DEL USUARIO INTERNO
 # 0 Utilizar endpoint de TOKEN y posterior el de usuario actual
 # 1 LISTAR VENTANILLAS CON ESTADO
-
+@extend_schema(
+    responses=VentanillaSerializer(many=True),
+    tags=["Ventanillas"]
+)
 class VentanillaListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
         ventanillas = Ventanila.objects.all()
-        data = [{"id": v.id, "nombre": v.nombre, "estado": v.estado.nombre} for v in ventanillas]
-        return Response(data)
+        serializer = VentanillaSerializer(ventanillas, many=True)
+        return Response(serializer.data)
 
 # ENDPOINT PARA CREAR REGISTRO EN PUESTO Y ACTUALIZAR ESTADO DE VENTANILLA
 class ConflictError(APIException):
@@ -519,6 +527,15 @@ class AsignarVentanillaView(APIView):
         }, status=status.HTTP_201_CREATED)
     
 # ENDPOINT PARA ATENDER TURNO. FUNCIONARIO - TOKEN - PUESTO
+@extend_schema(
+    methods=["POST"],
+    request=AtenderTurnoSerializer,
+    responses={
+        200: OpenApiResponse(description="Turno atendido con éxito."),
+        400: OpenApiResponse(description="Turno no disponible o atención duplicada."),
+        401: OpenApiResponse(description="Token inválido o expirado."),
+    },
+)
 @api_view(['POST'])
 def atender_turno(request, turno_id):
     token = request.headers.get('Authorization')
@@ -564,6 +581,15 @@ def atender_turno(request, turno_id):
     return Response({"message": "Turno atendido con éxito", "atencion_id": atencion.id})
 
 # ENPOINT PARA FINALIZAR ATENCION DE TURNO.
+@extend_schema(
+    request=None,
+    responses={
+        200: FinalizarTurnoResponseSerializer,
+        400: ErrorResponseSerializer,
+        401: ErrorResponseSerializer,
+        403: ErrorResponseSerializer,
+    }
+)
 @api_view(['POST'])
 def finalizar_turno(request, turno_id):  # Cambio: agregamos turno_id en los parámetros de la vista
     # Verificar si el token está presente en la cabecera
@@ -673,6 +699,10 @@ class LogoutView(APIView):
         return Response({"message": "Sesión cerrada correctamente."}, status=status.HTTP_200_OK)
     
 # ENDPOINT CON ESTADISTICAS USUARIO VENTANILLA: CANTIDAD DIA, HISTORICO TURNOS ATENDIDOS. TIEMPO PROMEDIO ATENCION POR TURNO, DIA HISTORICO.
+@extend_schema(
+    responses=EstadisticasFuncionarioSerializer,
+    tags=["Estadísticas"]
+)
 class EstadisticasFuncionarioView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -744,6 +774,16 @@ class EstadisticasFuncionarioView(APIView):
         })
 
 # ENDPOINT PARA CANCELAR TURNOS, SI EL TURNO NO ESTA EN ATENCION, PUEDE CANCELARLO CUALQUIER FUNCIONARIO, EN CASO DE QUE SE ENCUENTRE EN ATENCION UNICAMENTE LO PUEDE CANCELAR EL FUNCIONARIO QUE LO SOLICITO
+@extend_schema(
+    methods=["POST"],
+    responses={
+        200: FinalizarTurnoResponseSerializer,
+        400: ErrorResponseSerializer,
+        401: ErrorResponseSerializer,
+        403: ErrorResponseSerializer,
+    },
+    request=None  # No espera body en la petición
+)
 @api_view(['POST'])
 def cancelar_turno(request, turno_id):
     # Verificar token

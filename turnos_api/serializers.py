@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from.models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla, EstadoTurno
+from drf_spectacular.utils import extend_schema_field
 
 class FuncionarioSerializer(serializers.ModelSerializer):
     class Meta:
@@ -8,9 +9,18 @@ class FuncionarioSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class VentanillaSerializer(serializers.ModelSerializer):
+    nombre_estado = serializers.CharField(source='estado.nombre', read_only=True)
+
     class Meta:
         model = Ventanila
-        fields = '__all__'
+        fields = [
+            'id',
+            'nombre',
+            'estado',
+            'fecha_creacion',
+            'fecha_edicion',
+            'nombre_estado',
+        ]
 
 class TurnoSerializer(serializers.ModelSerializer):
     tipo_tramite_nombre = serializers.CharField(source='tipo_tramite.nombre', read_only=True)
@@ -53,6 +63,7 @@ class TurnoSerializer(serializers.ModelSerializer):
             'nombre_ventanilla',
         ]
 
+    @extend_schema_field(serializers.IntegerField())
     def get_tiempo_estimado_maximo(self, obj):
         if obj.tipo_turno.id == 1:  # Prioritario
             return 15
@@ -60,18 +71,22 @@ class TurnoSerializer(serializers.ModelSerializer):
             return obj.tipo_tramite.tiempo_espera
         return None
 
+    @extend_schema_field(serializers.IntegerField())
     def get_id_funcionario(self, obj):
         return obj.atencion.id_funcionario.id if hasattr(obj, 'atencion') else None
 
+    @extend_schema_field(serializers.CharField())
     def get_nombre_funcionario(self, obj):
         if hasattr(obj, 'atencion'):
             funcionario = obj.atencion.id_funcionario
             return funcionario.user.get_full_name() or funcionario.user.username
         return None
 
+    @extend_schema_field(serializers.IntegerField())
     def get_id_ventanilla(self, obj):
         return obj.atencion.id_ventanilla.id if hasattr(obj, 'atencion') else None
 
+    @extend_schema_field(serializers.CharField())
     def get_nombre_ventanilla(self, obj):
         if hasattr(obj, 'atencion'):
             return obj.atencion.id_ventanilla.nombre
@@ -111,6 +126,7 @@ class AtencionSerializer(serializers.ModelSerializer):
             'tiempo_atencion'
         ]
 
+    @extend_schema_field(serializers.FloatField())
     def get_tiempo_atencion(self, obj):
         if obj.fecha_fin_atencion and obj.fecha_atencion:
             delta = obj.fecha_fin_atencion - obj.fecha_atencion
@@ -134,6 +150,7 @@ class UsuarioAutenticadoSerializer(serializers.ModelSerializer):
                   "func_ventanilla",
                   "id_funcionario"]
 
+    @extend_schema_field(serializers.CharField())
     def get_func_ventanilla(self, obj):
         return obj.groups.filter(name="Ventanillas").exists()
 
@@ -173,3 +190,16 @@ class AtenderTurnoSerializer(serializers.Serializer):
 # SERIALIZADOR PARA INVALIDAR EL TOKEN Y REALIZAR EL LOGGOUT
 class LogoutSerializer(serializers.Serializer):
     refresh = serializers.CharField(help_text="Token de refresh que se va a invalidar")
+
+# SERIALIZADOR PARA RESPUESTA DE FINALIZACIÓN DE TURNO
+class FinalizarTurnoResponseSerializer(serializers.Serializer):
+    message = serializers.CharField(help_text="Mensaje de confirmación de finalización del turno.")
+class ErrorResponseSerializer(serializers.Serializer):
+    error = serializers.CharField(help_text="Mensaje de error.")
+
+# SERIALIZADOR PARA LAS ESTADISTICAS
+class EstadisticasFuncionarioSerializer(serializers.Serializer):
+    Conteo_Tramites_Hoy = serializers.IntegerField()
+    Promedio_Tramites_Dia_Historico = serializers.FloatField()
+    Tiempo_Promedio_Atencion_Dia = serializers.FloatField()
+    Tiempo_Promedio_Atencion_Historico = serializers.FloatField()
