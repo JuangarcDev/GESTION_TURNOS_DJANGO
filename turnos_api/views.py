@@ -806,6 +806,8 @@ def cancelar_turno(request, turno_id):
 
     # Obtener el turno
     turno = get_object_or_404(Turno, id=turno_id)
+    # Inicializamos la variable ATENCION None, para prevenir errores en caso de turno en espera
+    atencion = None  
 
     if turno.estado.nombre == "Espera":
         # Cualquier funcionario puede cancelar
@@ -823,8 +825,9 @@ def cancelar_turno(request, turno_id):
     turno.estado = estado_cancelado
     turno.save()
 
-    # Registrar la fecha de finalización en este caso de cancelar
-    atencion.fecha_fin_atencion = timezone.now()
-    atencion.save()
+    # Registrar la fecha de finalización en este caso de cancelar en caso de que esté en Atención
+    if atencion:
+        atencion.fecha_fin_atencion = timezone.now()
+        atencion.save()
 
     return Response({"message": "Turno cancelado correctamente."}, status=200)
