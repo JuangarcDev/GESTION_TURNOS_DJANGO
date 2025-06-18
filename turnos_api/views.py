@@ -852,50 +852,50 @@ class TurnosPorEstadoView(APIView):
         fecha_fin = request.GET.get("fin")
         user = request.user
 
-        print(f"🔐 Usuario autenticado: {user.username}")
-        print(f"📅 Fechas recibidas: inicio={fecha_inicio}, fin={fecha_fin}")
+        #print(f"🔐 Usuario autenticado: {user.username}")
+        #print(f"📅 Fechas recibidas: inicio={fecha_inicio}, fin={fecha_fin}")
 
         try:
             inicio = make_aware(datetime.strptime(fecha_inicio, "%Y-%m-%d"))
             fin = make_aware(datetime.strptime(fecha_fin, "%Y-%m-%d")) + timedelta(days=1)
         except Exception as e:
-            print(f"❌ Error en fecha: {e}")
+            #print(f"❌ Error en fecha: {e}")
             return Response({"error": "Formato de fecha inválido. Use YYYY-MM-DD"}, status=400)
 
         try:
             funcionario = Funcionario.objects.get(user=user)
-            print(f"👤 Funcionario: {funcionario} (ID: {funcionario.id})")
+            #print(f"👤 Funcionario: {funcionario} (ID: {funcionario.id})")
         except Funcionario.DoesNotExist:
-            print("❌ No se encontró un funcionario vinculado al usuario")
+            #print("❌ No se encontró un funcionario vinculado al usuario")
             return Response({'detail': 'El usuario no es un funcionario válido'}, status=403)
 
         # Obtener atenciones según grupo
         if user.groups.filter(name="Supervisores").exists():
-            print("🧭 Usuario es SUPERVISOR: verá todas las atenciones en el rango")
+            #print("🧭 Usuario es SUPERVISOR: verá todas las atenciones en el rango")
             atenciones = Atencion.objects.filter(fecha_atencion__range=(inicio, fin))
         elif user.groups.filter(name="Ventanillas").exists():
-            print("🧭 Usuario es FUNCIONARIO VENTANILLA: verá solo sus atenciones")
+            #print("🧭 Usuario es FUNCIONARIO VENTANILLA: verá solo sus atenciones")
             atenciones = Atencion.objects.filter(id_funcionario=funcionario, fecha_atencion__range=(inicio, fin))
         else:
-            print("❌ Usuario no tiene permisos")
+            #print("❌ Usuario no tiene permisos")
             return Response({"error": "Usuario no autorizado"}, status=403)
 
         total_atenciones = atenciones.count()
-        print(f"📌 Total atenciones encontradas: {total_atenciones}")
+        #print(f"📌 Total atenciones encontradas: {total_atenciones}")
 
         if total_atenciones == 0:
-            print("⚠️ No se encontraron atenciones en el rango indicado")
+            #print("⚠️ No se encontraron atenciones en el rango indicado")
             return Response([])
 
         # Agrupar por estado de turno
         data = atenciones.values("id_turno__estado__nombre").annotate(total=Count("id"))
-        print(f"📊 Conteo por estado: {list(data)}")
+        #print(f"📊 Conteo por estado: {list(data)}")
 
         resultado = [{"label": x["id_turno__estado__nombre"], "value": x["total"]} for x in data]
 
         return Response(resultado)
     
-# 2 ESTADISITICAS TURNOS POR HORA O POR DIA EN UN RANGO DE FECHA
+# 2 ESTADISITICAS TURNOS POR HORA O POR DIA EN UN RANGO DE FECHA. VERIFICAR SI CUMPLE CON LA NECESIDAD, AMBIGUO
 @extend_schema(
     summary="Cantidad de turnos por hora o día",
     parameters=[
@@ -1020,7 +1020,7 @@ class PromedioAtencionPorTramiteView(APIView):
         ]
         return Response(resultado)
     
-# 5 TOTALES; CANTIDAD DE TURNOS Y PROMEDIO DE ATENCION
+# 5 TOTALES; CANTIDAD DE TURNOS Y PROMEDIO DE ATENCION, CANTIDA DE GENERALES Y CANTIDAD DE PRIORITARIOS
 @extend_schema(
     summary="Totales: cantidad de turnos y tiempo promedio",
     parameters=[
@@ -1038,22 +1038,30 @@ class TotalesGeneralesView(APIView):
         fecha_fin = request.GET.get("fin")
         user = request.user
 
+        #print(f" Usuario autenticado: {user.username}")
+        #print(f" Rango de fechas recibido: {fecha_inicio} a {fecha_fin}")
+
         try:
             inicio = make_aware(datetime.strptime(fecha_inicio, "%Y-%m-%d"))
             fin = make_aware(datetime.strptime(fecha_fin, "%Y-%m-%d")) + timedelta(days=1)
-        except:
+        except Exception as e:
+            #print(f"❌ Error en fechas: {e}")
             return Response({"error": "Formato de fecha inválido."}, status=400)
 
         queryset = Atencion.objects.filter(
             fecha_atencion__range=(inicio, fin),
             fecha_fin_atencion__isnull=False
         ).annotate(
-            duracion=ExpressionWrapper(F('fecha_fin_atencion') - F('fecha_atencion'), output_field=DurationField())
+            duracion=ExpressionWrapper(
+                F('fecha_fin_atencion') - F('fecha_atencion'),
+                output_field=DurationField()
+            )
         )
 
         if user.groups.filter(name="Ventanillas").exists():
             funcionario = Funcionario.objects.get(user=user)
             queryset = queryset.filter(id_funcionario=funcionario)
+            #print(f" Funcionario filtrado: {funcionario}")
         elif not user.groups.filter(name="Supervisores").exists():
             return Response({"error": "Usuario no autorizado"}, status=403)
 
@@ -1061,7 +1069,18 @@ class TotalesGeneralesView(APIView):
         promedio_tiempo = queryset.aggregate(prom=Avg("duracion"))["prom"]
         promedio_minutos = round(promedio_tiempo.total_seconds() / 60, 2) if promedio_tiempo else 0
 
+        # ✅ Contar los tipos de turno por nombre
+        total_prioritarios = queryset.filter(id_turno__tipo_turno__nombre__iexact="Prioritario").count()
+        total_generales = queryset.filter(id_turno__tipo_turno__nombre__iexact="General").count()
+
+        #print(f" Total turnos atendidos: {total_turnos}")
+        #print(f" Promedio de tiempo: {promedio_minutos} minutos")
+        #print(f" Total prioritarios: {total_prioritarios}")
+        #print(f" Total generales: {total_generales}")
+
         return Response({
             "total_turnos": total_turnos,
-            "promedio_tiempo_min": promedio_minutos
+            "promedio_tiempo_min": promedio_minutos,
+            "total_prioritarios": total_prioritarios,
+            "total_generales": total_generales
         })
