@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import FuncionarioViewSet, VentanillaViewSet, TurnoViewSet, UsuarioViewSet, AtencionViewSet, PuestoViewSet, UsuarioActualView, TipoTramiteListView, TipoTurnoListView, VentanillaListView, AsignarVentanillaView, atender_turno, finalizar_turno, LogoutView, EstadisticasFuncionarioView, cancelar_turno
+from .views import FuncionarioViewSet, VentanillaViewSet, TurnoViewSet, UsuarioViewSet, AtencionViewSet, PuestoViewSet, UsuarioActualView, TipoTramiteListView, TipoTurnoListView, VentanillaListView, AsignarVentanillaView, atender_turno, finalizar_turno, LogoutView, EstadisticasFuncionarioView, cancelar_turno, TurnosPorEstadoView, TurnosPorHoraDiaView, TurnosPorTramiteView, PromedioAtencionPorTramiteView, TotalesGeneralesView
 
 # Configuración de las rutas de la API
 router = DefaultRouter()
@@ -24,4 +24,9 @@ urlpatterns = [
     path("logout/", LogoutView.as_view(), name="logout"),
     path('estadisticas-funcionario/', EstadisticasFuncionarioView.as_view(), name='estadisticas_funcionario'),
     path('cancelar-turno/<int:turno_id>/', cancelar_turno, name='cancelar_turno'),
+    path("estadisticas/por-estado/", TurnosPorEstadoView.as_view()),
+    path("estadisticas/por-tiempo/", TurnosPorHoraDiaView.as_view()),
+    path("estadisticas/por-tramite/", TurnosPorTramiteView.as_view()),
+    path("estadisticas/atencion-por-tramite/", PromedioAtencionPorTramiteView.as_view()),
+    path("estadisticas/totales/", TotalesGeneralesView.as_view()),
 ]

@@ -203,3 +203,9 @@ class EstadisticasFuncionarioSerializer(serializers.Serializer):
     Promedio_Tramites_Dia_Historico = serializers.FloatField()
     Tiempo_Promedio_Atencion_Dia = serializers.FloatField()
     Tiempo_Promedio_Atencion_Historico = serializers.FloatField()
+
+# SERIALIZADORES PARA EL MODULO DE ESTADISTICAS
+class EstadisticaLabelValorSerializer(serializers.Serializer):
+    label = serializers.CharField(help_text="Nombre o categoría (ej. estado, trámite, fecha, etc.)")
+    value = serializers.FloatField(help_text="Valor numérico correspondiente")
+    
