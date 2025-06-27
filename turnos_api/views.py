@@ -44,22 +44,23 @@ def generar_nombre_turno(tipo_tramite_abrev, tipo_turno_abrev):
 
 # Create your views here.
 class FuncionarioViewSet(viewsets.ModelViewSet):
-    queryset = Funcionario.objects.all()
+    queryset = Funcionario.objects.select_related('user')  # OPTIMIZACIÓN
     serializer_class = FuncionarioSerializer
     permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
-            # Llama a la función común para manejar excepciones
-            return handle_custom_exception(
-                self.get_queryset(),
-                FuncionarioSerializer,
-                "La consulta ha sido exitosa",
-                "No se encontraron registros en la base de datos"
-            )
+            queryset = list(self.get_queryset())  # Evalúa una sola vez
+            if not queryset:
+                raise CustomAPIException("No se encontraron registros en la base de datos", 404)
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                "success": True,
+                "message": "La consulta ha sido exitosa",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
         except CustomAPIException as e:
             return Response(e.detail, status=e.status_code)
-        
         except Exception as e:
             return Response({
                 "success": False,
@@ -67,26 +68,28 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class VentanillaViewSet(viewsets.ModelViewSet):
-    queryset = Ventanila.objects.all()
+    queryset = Ventanila.objects.select_related('estado')  # OPTIMIZACIÓN
     serializer_class = VentanillaSerializer
     permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
-            return handle_custom_exception(
-                self.get_queryset(),
-                VentanillaSerializer,
-                "La consulta ha sido exitosa",
-                "No se encontraron registros en la base de datos"
-            )
+            queryset = list(self.get_queryset())
+            if not queryset:
+                raise CustomAPIException("No se encontraron registros en la base de datos", 404)
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                "success": True,
+                "message": "La consulta ha sido exitosa",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
         except CustomAPIException as e:
             return Response(e.detail, status=e.status_code)
-
         except Exception as e:
             return Response({
                 "success": False,
                 "message": "Ocurrió un error inesperado: " + str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)    
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class TurnoViewSet(viewsets.ModelViewSet):
     queryset = Turno.objects.all()
@@ -103,23 +106,26 @@ class TurnoViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
 
-        # Obtener la hora actual como fecha_turno por defecto
         if 'fecha_turno' not in data or not data['fecha_turno']:
             data['fecha_turno'] = localtime()
 
-        # Estado del turno por defecto en espera
         if 'estado' not in data or not data['estado']:
             data['estado'] = 1
 
-        # Generar el nombre del turno
         if 'turno' not in data or not data['turno']:
             try:
-                tramite_abrev = Turno.objects.model.tipo_tramite.field.related_model.objects.get(id=int(data['tipo_tramite'])).abreviado
-                tipo_abrev = Turno.objects.model.tipo_turno.field.related_model.objects.get(id=int(data['tipo_turno'])).abreviado
-                data['turno'] = generar_nombre_turno(tramite_abrev, tipo_abrev)
+                tramite_id = int(data['tipo_tramite'])
+                tipo_id = int(data['tipo_turno'])
+
+                tramite = TipoTramite.objects.only('abreviado').get(id=tramite_id)
+                tipo = TipoTurno.objects.only('abreviado').get(id=tipo_id)
+
+                data['turno'] = generar_nombre_turno(tramite.abreviado, tipo.abreviado)
+            except (TipoTramite.DoesNotExist, TipoTurno.DoesNotExist):
+                return Response({'error': 'Tipo de trámite o tipo de turno no válido.'}, status=400)
             except Exception as e:
                 return Response({'error': f'Error generando el nombre del turno: {str(e)}'}, status=400)
-        
+
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -127,20 +133,26 @@ class TurnoViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         try:
-            return handle_custom_exception(
-                self.get_queryset(),
-                TurnoSerializer,
-                "La consulta ha sido exitosa",
-                "No se encontraron registros en la base de datos"
+            queryset = self.get_queryset().select_related(
+                'tipo_tramite', 'tipo_turno', 'estado', 'id_usuario'
             )
+            if not queryset.exists():
+                raise CustomAPIException("No se encontraron registros en la base de datos", 404)
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                "success": True,
+                "message": "La consulta ha sido exitosa",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
         except CustomAPIException as e:
             return Response(e.detail, status=e.status_code)
-
         except Exception as e:
             return Response({
                 "success": False,
                 "message": "Ocurrió un error inesperado: " + str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         
     #ACA CREAMOS LA PARTE DEL ENDPOINT PERSONALIZADO PARA BUSCAR POR ID DEL ESTADO EL ACTION PARA CREAR EL ENDPOINT Y EL EXTEND PARA PASARLE EL PARAMETRO QUE RECIBE EL ENDPOINT
     @extend_schema(
@@ -229,18 +241,18 @@ class TurnoViewSet(viewsets.ModelViewSet):
         turno = request.GET.get('turno', '').strip()
         fecha_turno = request.GET.get('fecha_turno', '').strip()
 
-        turnos = Turno.objects.all()
-
+        filtros = Q()
         if turno:
-            turnos = turnos.filter(turno__icontains=turno)
+            filtros &= Q(turno__icontains=turno)
 
         if fecha_turno:
             fecha = parse_date(fecha_turno)
             if not fecha:
                 return Response({'error': 'Formato de fecha inválido. Use YYYY-MM-DD.'}, status=400)
-            turnos = turnos.filter(fecha_turno__date=fecha)
+            filtros &= Q(fecha_turno__date=fecha)
 
-        turnos = turnos.order_by('fecha_turno')
+        turnos = Turno.objects.select_related('tipo_tramite', 'tipo_turno', 'estado', 'id_usuario').filter(filtros).order_by('fecha_turno')
+
         serializer = TurnoSerializer(turnos, many=True)
         return Response(serializer.data)
 
@@ -257,8 +269,9 @@ class TurnoViewSet(viewsets.ModelViewSet):
         if not documento:
             return Response({'error': 'Debe proporcionar un número de documento.'}, status=400)
 
-        # 💡 OJO aquí: relacionamos Turno con Usuario a través de id_usuario__cedula
-        turnos = Turno.objects.filter(id_usuario__cedula=documento).order_by('fecha_turno')
+        turnos = Turno.objects.select_related(
+            'tipo_tramite', 'tipo_turno', 'estado', 'id_usuario'
+        ).filter(id_usuario__cedula=documento).order_by('fecha_turno')
 
         if not turnos.exists():
             return Response({'message': 'No se encontraron turnos para el documento proporcionado.'}, status=404)
@@ -275,13 +288,13 @@ class TurnoViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['get'], url_path='buscar-por-estado-tramite')
     def buscar_por_estado_tramite(self, request):
-        estado_id = request.GET.get('estado_id', None)
-        tipo_tramite_id = request.GET.get('tipo_tramite_id', None)
+        estado_id = request.GET.get('estado_id')
+        tipo_tramite_id = request.GET.get('tipo_tramite_id')
 
-        # Inicializar la consulta base para todos los turnos
-        turnos = Turno.objects.all()
+        turnos = Turno.objects.select_related(
+            'tipo_tramite', 'tipo_turno', 'estado', 'id_usuario'
+        )
 
-        # Filtrar por estado si se proporciona
         if estado_id:
             try:
                 estado_id = int(estado_id)
@@ -291,7 +304,6 @@ class TurnoViewSet(viewsets.ModelViewSet):
             except (TypeError, ValueError):
                 return Response({'error': 'Debe proporcionar un estado_id válido (int).'}, status=400)
 
-        # Filtrar por tipo de trámite si se proporciona
         if tipo_tramite_id:
             try:
                 tipo_tramite_id = int(tipo_tramite_id)
@@ -299,10 +311,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
             except ValueError:
                 return Response({'error': 'tipo_tramite_id debe ser un número entero.'}, status=400)
 
-        # Orden descendente por fecha_turno
         turnos = turnos.order_by('-fecha_turno')
-
-        # Serialización de los resultados
         serializer = TurnoSerializer(turnos, many=True)
         return Response(serializer.data)
 
@@ -326,15 +335,14 @@ class UsuarioViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['get'], url_path='buscar-por-cedula')
     def buscar_por_cedula(self, request):
-        """Consulta pública de usuario por número de cédula."""
         cedula = request.query_params.get('cedula', '').strip()
 
         if not cedula:
             return Response({'success': False, 'message': 'Debe proporcionar una cédula.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        usuario = Usuario.objects.filter(cedula=cedula).first()
-
-        if not usuario:
+        try:
+            usuario = Usuario.objects.get(cedula=cedula)
+        except Usuario.DoesNotExist:
             return Response({'success': False, 'message': 'No se encontró ningún usuario con la cédula proporcionada.'}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = self.get_serializer(usuario)
@@ -377,9 +385,11 @@ class AtencionViewSet(viewsets.ModelViewSet):
     def ultimas_6(self, request):
         try:
             hoy = localtime(now()).date()
-            atenciones = Atencion.objects.filter(
-                fecha_atencion__date=hoy
-            ).select_related('id_turno__id_usuario', 'id_turno__estado', 'id_ventanilla').order_by('-fecha_atencion')[:6]
+            atenciones = (
+                Atencion.objects.filter(fecha_atencion__date=hoy)
+                .select_related('id_turno__id_usuario', 'id_turno__estado', 'id_ventanilla')
+                .order_by('-fecha_atencion')[:6]
+            )
 
             resultado = []
             for atencion in atenciones:
@@ -436,55 +446,40 @@ class UsuarioActualView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        Usuario = request.user
-        serializer = UsuarioAutenticadoSerializer(Usuario)
+        serializer = UsuarioAutenticadoSerializer(request.user)
         return Response(serializer.data)
-    
-# CREAR VISTA PARA LISTAR TIPO DE TRAMITES
-class TipoTramiteListView(ListAPIView):
-    queryset = TipoTramite.objects.all()
-    serializer_class = TipoTramiteSerializer
+
+class BaseListView(ListAPIView):
     permission_classes = [AllowAny]
+    serializer_class = None  # Obligatorio redefinir
+    queryset = None
 
     def list(self, request, *args, **kwargs):
         try:
             return handle_custom_exception(
                 self.get_queryset(),
-                TipoTramiteSerializer,
+                self.serializer_class,
                 "La consulta ha sido exitosa",
                 "No se encontraron registros en la base de datos"
             )
         except CustomAPIException as e:
             return Response(e.detail, status=e.status_code)
-
         except Exception as e:
             return Response({
                 "success": False,
                 "message": "Ocurrió un error inesperado: " + str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# CREAR VISTA PARA LISTAR TIPO DE TRAMITES
+class TipoTramiteListView(BaseListView):
+    serializer_class = TipoTramiteSerializer
+    queryset = TipoTramite.objects.all()
 
 # CREAR VISTA PARA LISTAR LOS TIPOS DE TURNOS
-class TipoTurnoListView(ListAPIView):
-    queryset = TipoTurno.objects.all()
+class TipoTurnoListView(BaseListView):
     serializer_class = TipoTurnoSerializer
-    permission_classes = [AllowAny]
+    queryset = TipoTurno.objects.all()
 
-    def list(self, request, *args, **kwargs):
-        try:
-            return handle_custom_exception(
-                self.get_queryset(),
-                TipoTurnoSerializer,
-                "La consulta ha sido exitosa",
-                "No se encontraron registros en la base de datos"
-            )
-        except CustomAPIException as e:
-            return Response(e.detail, status=e.status_code)
-
-        except Exception as e:
-            return Response({
-                "success": False,
-                "message": "Ocurrió un error inesperado: " + str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 # ENDPOINTS PARA EL LOGEO Y FUNCIONES GENERALES DEL USUARIO INTERNO
 # 0 Utilizar endpoint de TOKEN y posterior el de usuario actual
@@ -493,13 +488,10 @@ class TipoTurnoListView(ListAPIView):
     responses=VentanillaSerializer(many=True),
     tags=["Ventanillas"]
 )
-class VentanillaListView(APIView):
+class VentanillaListView(ListAPIView):
+    queryset = Ventanila.objects.all()
+    serializer_class = VentanillaSerializer
     permission_classes = [AllowAny]
-
-    def get(self, request):
-        ventanillas = Ventanila.objects.all()
-        serializer = VentanillaSerializer(ventanillas, many=True)
-        return Response(serializer.data)
 
 # ENDPOINT PARA CREAR REGISTRO EN PUESTO Y ACTUALIZAR ESTADO DE VENTANILLA
 class ConflictError(APIException):
@@ -522,39 +514,29 @@ class AsignarVentanillaView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        funcionario_id = request.data.get("funcionario_id")
-        ventanilla_id = request.data.get("ventanilla_id")
-        confirmar = request.data.get("confirmar", False)
+        data = request.data
+        funcionario_id = data.get("funcionario_id")
+        ventanilla_id = data.get("ventanilla_id")
+        confirmar = data.get("confirmar", False)
 
-        # Validación de parámetros obligatorios
+        # Validación de existencia del funcionario y la ventanilla:
         if not funcionario_id or not ventanilla_id:
             raise ValidationError({
                 "funcionario_id": "Este campo es obligatorio.",
                 "ventanilla_id": "Este campo es obligatorio."
             })
 
-        # Validación de existencia del funcionario
-        try:
-            funcionario = Funcionario.objects.get(id=funcionario_id)
-        except Funcionario.DoesNotExist:
-            raise NotFound(detail=f"Funcionario con ID {funcionario_id} no encontrado.", code="funcionario_no_encontrado")
-
-        # Validación de existencia de la ventanilla
-        try:
-            ventanilla = Ventanila.objects.get(id=ventanilla_id)
-        except Ventanila.DoesNotExist:
-            raise NotFound(detail=f"Ventanilla con ID {ventanilla_id} no encontrada.", code="ventanilla_no_encontrada")
+        funcionario = get_object_or_404(Funcionario, id=funcionario_id)
+        ventanilla = get_object_or_404(Ventanila, id=ventanilla_id)
 
         # Validación de ocupación de la ventanilla
         if ventanilla.estado.nombre == "Ocupada" and not confirmar:
-            raise ConflictError(detail={
+            raise ConflictError({
                 "message": "La ventanilla está actualmente ocupada. Debe confirmar si desea continuar.",
                 "require_confirm": True
             })
 
-
-        # Obtener token del usuario autenticado
-        # Obtener token JWT desde el header
+        # Obtener token del usuario autenticado  Obtener token JWT desde el header
         auth_header = request.headers.get('Authorization', '')
         token_value = auth_header.split(' ')[1] if auth_header.startswith('Bearer ') else None
 
@@ -566,11 +548,10 @@ class AsignarVentanillaView(APIView):
         )
 
         # Cambio de estado de la ventanilla
-        try:
-            estado_ocupada = EstadoVentanilla.objects.get(nombre="Ocupada")
-        except EstadoVentanilla.DoesNotExist:
-            raise APIException(detail="El estado 'Ocupada' no está definido en el sistema.", code="estado_no_encontrado")
-
+        estado_ocupada = EstadoVentanilla.objects.filter(nombre="Ocupada").first()
+        if not estado_ocupada:
+            raise APIException("El estado 'Ocupada' no está definido en el sistema.")
+        
         ventanilla.estado = estado_ocupada
         ventanilla.save()
 
@@ -592,25 +573,22 @@ class AsignarVentanillaView(APIView):
     },
 )
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def atender_turno(request, turno_id):
-    token = request.headers.get('Authorization')
+    token_header = request.headers.get('Authorization', '')
+    token = token_header.split(' ')[1] if token_header.startswith('Bearer ') else None
+
     if not token:
         return Response({"error": "Token requerido."}, status=400)
 
     try:
-        # Extraemos el token del encabezado
-        token = token.split(' ')[1]
-        UntypedToken(token)  # Verifica que el token es válido
-    except IndexError:
-        return Response({"error": "Token mal formado."}, status=400)
+        UntypedToken(token)
     except AuthenticationFailed:
         return Response({"error": "Token inválido o expirado."}, status=401)
 
-    #print(f"Token recibido y verificado: {token}")  # Verificación en el log
-
-    puesto = Puesto.objects.filter(token=token, fecha_salida__isnull=True).first()
-
-    if not puesto:
+    try:
+        puesto = Puesto.objects.get(token=token, fecha_salida__isnull=True)
+    except Puesto.DoesNotExist:
         return Response({"error": "Token inválido o sesión terminada."}, status=401)
 
     # Verificar si ya hay una atención activa del funcionario
@@ -618,11 +596,12 @@ def atender_turno(request, turno_id):
         return Response({"error": "Ya existe un turno en atención. Debe finalizarlo antes."}, status=400)
 
     turno = get_object_or_404(Turno, id=turno_id)
+
     if turno.estado.nombre != "Espera":
         return Response({"error": "El turno no está disponible para ser atendido."}, status=400)
 
     # Cambiar estado del turno a EN ATENCION
-    estado_en_atencion = EstadoTurno.objects.get(nombre="Atención")
+    estado_en_atencion = get_object_or_404(EstadoTurno, nombre="Atención")
     turno.estado = estado_en_atencion
     turno.save()
 
@@ -633,7 +612,10 @@ def atender_turno(request, turno_id):
         fecha_atencion=localtime()
     )
 
-    return Response({"message": "Turno atendido con éxito", "atencion_id": atencion.id})
+    return Response({
+        "message": "Turno atendido con éxito",
+        "atencion_id": atencion.id
+    })
 
 # ENPOINT PARA FINALIZAR ATENCION DE TURNO.
 @extend_schema(
@@ -646,42 +628,36 @@ def atender_turno(request, turno_id):
     }
 )
 @api_view(['POST'])
-def finalizar_turno(request, turno_id):  # Cambio: agregamos turno_id en los parámetros de la vista
-    # Verificar si el token está presente en la cabecera
-    token = request.headers.get('Authorization')
+@permission_classes([IsAuthenticated])
+def finalizar_turno(request, turno_id):
+    token_header = request.headers.get('Authorization', '')
+    token = token_header.split(' ')[1] if token_header.startswith('Bearer ') else None
     if not token:
         return Response({"error": "Token requerido."}, status=400)
 
     try:
-        # Extraemos el token del encabezado y verificamos su validez
-        token = token.split(' ')[1]
-        UntypedToken(token)  # Verifica que el token es válido
-    except IndexError:
-        return Response({"error": "Token mal formado."}, status=400)
-    except AuthenticationFailed:
-        return Response({"error": "Token inválido o expirado."}, status=401)
+        UntypedToken(token)
+    except (IndexError, AuthenticationFailed):
+        return Response({"error": "Token inválido o mal formado."}, status=401)
 
-    # Buscar el puesto asociado al token
     puesto = Puesto.objects.filter(token=token, fecha_salida__isnull=True).first()
     if not puesto:
         return Response({"error": "Token inválido o sesión terminada."}, status=401)
 
-    # Obtener el turno a partir del ID en la URL
     turno = get_object_or_404(Turno, id=turno_id)
     if turno.estado.nombre != "Atención":
         return Response({"error": "Este turno no está en atención actualmente."}, status=400)
 
-    # Validar que el turno fue atendido por este funcionario
     atencion = Atencion.objects.filter(id_turno=turno, id_funcionario=puesto.id_funcionario).first()
     if not atencion:
         return Response({"error": "Este turno no está siendo atendido por usted."}, status=403)
 
-    # Cambiar el estado del turno a 'Atendido'
-    estado_atendido = EstadoTurno.objects.get(nombre="Finalizado")
-    turno.estado = estado_atendido
-    turno.save()
+    try:
+        turno.estado = EstadoTurno.objects.get(nombre="Finalizado")
+    except EstadoTurno.DoesNotExist:
+        return Response({"error": "Estado 'Finalizado' no encontrado."}, status=500)
 
-    # Registrar la fecha de finalización
+    turno.save()
     atencion.fecha_fin_atencion = timezone.now()
     atencion.save()
 
@@ -699,43 +675,33 @@ class LogoutView(APIView):
         description="Recibe el token de refresh en el body para cerrar sesión e invalidar el token.",
     )
     def post(self, request):
-        # -------------------------
         # 1. Invalidar Refresh Token
-        # -------------------------
         serializer = LogoutSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
 
         refresh_token = serializer.validated_data['refresh']
         try:
             token = RefreshToken(refresh_token)
             jti = token['jti']
-
             outstanding_token = OutstandingToken.objects.filter(jti=jti).first()
+            
             if not outstanding_token:
-                return Response({"error": "Token no encontrado en Outstanding."}, status=status.HTTP_400_BAD_REQUEST)
-
+                return Response({"error": "Token no encontrado."}, status=400)
             BlacklistedToken.objects.get_or_create(token=outstanding_token)
         except TokenError:
-            return Response({"error": "Refresh token inválido o ya expirado."}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({"error": f"Error al invalidar refresh token: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "Refresh token inválido."}, status=400)
+        
+        #  Paso 2: Cerrar sesión (acceso) y liberar ventanilla
+        access_header = request.headers.get('Authorization', '')
+        access_token = access_header.split(' ')[1] if access_header.startswith("Bearer ") else None
+        if not access_token:
+            return Response({"error": "Access token requerido."}, status=400)
 
-        # -------------------------
-        # 2. Cerrar puesto y ventanilla con Access Token
-        # -------------------------
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return Response({"error": "Access token no proporcionado en el header."}, status=status.HTTP_400_BAD_REQUEST)
-
-        access_token = auth_header.split(' ')[1]
         try:
-            UntypedToken(access_token)  # Verifica si el token es válido
+            UntypedToken(access_token)
         except AuthenticationFailed:
-            return Response({"error": "Access token inválido o expirado."}, status=status.HTTP_401_UNAUTHORIZED)
-        except Exception as e:
-            return Response({"error": f"Error al verificar access token: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-
+            return Response({"error": "Access token inválido."}, status=401)
+        
         # Buscar puesto activo con ese access token
         puesto = Puesto.objects.filter(token=access_token, fecha_salida__isnull=True).first()
         if puesto:
@@ -745,13 +711,12 @@ class LogoutView(APIView):
 
             try:
                 estado_libre = EstadoVentanilla.objects.get(nombre="Libre")
-                ventanilla = puesto.id_ventanilla
-                ventanilla.estado = estado_libre
-                ventanilla.save()
+                puesto.id_ventanilla.estado = estado_libre
+                puesto.id_ventanilla.save()
             except EstadoVentanilla.DoesNotExist:
-                return Response({"error": "El estado 'Libre' no está definido en el sistema."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response({"error": "Estado 'Libre' no definido."}, status=500)
 
-        return Response({"message": "Sesión cerrada correctamente."}, status=status.HTTP_200_OK)
+        return Response({"message": "Sesión cerrada correctamente."})
     
 # ENDPOINT CON ESTADISTICAS USUARIO VENTANILLA: CANTIDAD DIA, HISTORICO TURNOS ATENDIDOS. TIEMPO PROMEDIO ATENCION POR TURNO, DIA HISTORICO.
 @extend_schema(
@@ -762,11 +727,9 @@ class EstadisticasFuncionarioView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
-
         # Verificar si es funcionario
         try:
-            funcionario = Funcionario.objects.get(user=user)
+            funcionario = Funcionario.objects.get(user=request.user)
         except Funcionario.DoesNotExist:
             return Response({'detail': 'El usuario no es un funcionario válido'}, status=403)
 
@@ -777,18 +740,17 @@ class EstadisticasFuncionarioView(APIView):
             id_funcionario=funcionario,
             fecha_atencion__date=hoy,
             fecha_fin_atencion__isnull=False
+        ).annotate(
+            duracion=ExpressionWrapper(
+                F('fecha_fin_atencion') - F('fecha_atencion'),
+                output_field=DurationField()
+            )
         )
 
         # Conteo de trámites atendidos hoy
         total_tramites_hoy = atenciones_hoy.count()
 
         # Tiempo promedio de atención hoy (en minutos)
-        atenciones_hoy = atenciones_hoy.annotate(
-            duracion=ExpressionWrapper(
-                F('fecha_fin_atencion') - F('fecha_atencion'),
-                output_field=DurationField()
-            )
-        )
         tiempo_promedio_hoy = atenciones_hoy.aggregate(
             promedio=Avg('duracion')
         )['promedio']
@@ -800,7 +762,11 @@ class EstadisticasFuncionarioView(APIView):
             fecha_atencion__date__lt=hoy,
             fecha_fin_atencion__isnull=False
         ).annotate(
-            dia=TruncDate('fecha_atencion')
+            dia=TruncDate('fecha_atencion'),
+            duracion=ExpressionWrapper(
+                F('fecha_fin_atencion') - F('fecha_atencion'),
+                output_field=DurationField()
+            )
         )
 
         # Promedio de trámites por día (anteriores)
@@ -810,12 +776,6 @@ class EstadisticasFuncionarioView(APIView):
         promedio_tramites_por_dia = round(total_tramites_anteriores / total_dias, 2) if total_dias else 0
 
         # Tiempo promedio de atención por día en días anteriores
-        atenciones_pasadas = atenciones_pasadas.annotate(
-            duracion=ExpressionWrapper(
-                F('fecha_fin_atencion') - F('fecha_atencion'),
-                output_field=DurationField()
-            )
-        )
         tiempo_promedio_anteriores = atenciones_pasadas.aggregate(
             promedio=Avg('duracion')
         )['promedio']
@@ -829,6 +789,7 @@ class EstadisticasFuncionarioView(APIView):
         })
 
 # ENDPOINT PARA CANCELAR TURNOS, SI EL TURNO NO ESTA EN ATENCION, PUEDE CANCELARLO CUALQUIER FUNCIONARIO, EN CASO DE QUE SE ENCUENTRE EN ATENCION UNICAMENTE LO PUEDE CANCELAR EL FUNCIONARIO QUE LO SOLICITO
+@api_view(['POST'])
 @extend_schema(
     methods=["POST"],
     responses={
@@ -837,9 +798,8 @@ class EstadisticasFuncionarioView(APIView):
         401: ErrorResponseSerializer,
         403: ErrorResponseSerializer,
     },
-    request=None  # No espera body en la petición
+    request=None
 )
-@api_view(['POST'])
 def cancelar_turno(request, turno_id):
     # Verificar token
     token = request.headers.get('Authorization')
@@ -853,16 +813,16 @@ def cancelar_turno(request, turno_id):
         return Response({"error": "Token inválido o expirado."}, status=401)
 
     # Obtener puesto activo del funcionario
-    puesto = Puesto.objects.filter(token=token, fecha_salida__isnull=True).first()
+    puesto = Puesto.objects.select_related("id_funcionario").filter(token=token, fecha_salida__isnull=True).first()
     if not puesto:
         return Response({"error": "Token inválido o sesión terminada."}, status=401)
 
     funcionario = puesto.id_funcionario
 
     # Obtener el turno
-    turno = get_object_or_404(Turno, id=turno_id)
+    turno = get_object_or_404(Turno.objects.select_related("estado"), id=turno_id)
     # Inicializamos la variable ATENCION None, para prevenir errores en caso de turno en espera
-    atencion = None  
+    atencion = None
 
     if turno.estado.nombre == "Espera":
         # Cualquier funcionario puede cancelar
@@ -876,7 +836,7 @@ def cancelar_turno(request, turno_id):
         return Response({"error": f"No se puede cancelar un turno en estado '{turno.estado.nombre}'."}, status=400)
 
     # Cambiar estado a "Cancelado"
-    estado_cancelado = EstadoTurno.objects.get(nombre="Cancelado")
+    estado_cancelado = get_object_or_404(EstadoTurno, nombre="Cancelado")
     turno.estado = estado_cancelado
     turno.save()
 
@@ -906,9 +866,6 @@ class TurnosPorEstadoView(APIView):
         fecha_inicio = request.GET.get("inicio")
         fecha_fin = request.GET.get("fin")
         user = request.user
-
-        #print(f"🔐 Usuario autenticado: {user.username}")
-        #print(f"📅 Fechas recibidas: inicio={fecha_inicio}, fin={fecha_fin}")
 
         try:
             inicio = make_aware(datetime.strptime(fecha_inicio, "%Y-%m-%d"))
@@ -943,6 +900,7 @@ class TurnosPorEstadoView(APIView):
             return Response([])
 
         # Agrupar por estado de turno
+        atenciones = atenciones.select_related("id_turno__estado")
         data = atenciones.values("id_turno__estado__nombre").annotate(total=Count("id"))
         #print(f"📊 Conteo por estado: {list(data)}")
 
