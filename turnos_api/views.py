@@ -12,6 +12,8 @@ from .utils import handle_custom_exception
 from .exceptions import CustomAPIException
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes, OpenApiExample, OpenApiResponse, extend_schema_view
 from django.utils.timezone import now, localtime, make_aware
+from datetime import datetime, time
+import pytz
 from django.db.models import Count, Avg, F, ExpressionWrapper, DurationField
 from datetime import datetime, timedelta
 from rest_framework.generics import ListAPIView
@@ -25,7 +27,7 @@ from jwt import decode as jwt_decode
 from django.conf import settings
 from django.utils import timezone
 from django.db.models.functions import TruncDate
-#import pytz
+
 
 # UTILIDAD MOVER POSTERIORMENTE A SU PROPIO FICHERO
 
@@ -141,23 +143,73 @@ class TurnoViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     #ACA CREAMOS LA PARTE DEL ENDPOINT PERSONALIZADO PARA BUSCAR POR ID DEL ESTADO EL ACTION PARA CREAR EL ENDPOINT Y EL EXTEND PARA PASARLE EL PARAMETRO QUE RECIBE EL ENDPOINT
     @extend_schema(
-            parameters=[
-                OpenApiParameter(name='estado_id',required=True, type=int, location=OpenApiParameter.QUERY, description='ID del estado del turno (1 a 4)')
-            ]
+        parameters=[
+            OpenApiParameter(name='estado_id', required=False, type=int, location=OpenApiParameter.QUERY, description='ID del estado del turno (1 a 4, opcional)'),
+            OpenApiParameter(name='fecha_inicio', required=False, type=str, location=OpenApiParameter.QUERY, description='Fecha de inicio en formato YYYY-MM-DD'),
+            OpenApiParameter(name='fecha_fin', required=False, type=str, location=OpenApiParameter.QUERY, description='Fecha de fin en formato YYYY-MM-DD'),
+        ]
     )
     @action(detail=False, methods=['get'], url_path='por-estado')
     def por_estado(self, request):
         estado_id = request.GET.get('estado_id')
+        fecha_inicio_str = request.GET.get('fecha_inicio')
+        fecha_fin_str = request.GET.get('fecha_fin')
+
+        token = request.headers.get('Authorization')
+        if not token:
+            return Response({"error": "Token requerido en el header Authorization"}, status=400)
 
         try:
-            estado_id = int(estado_id)
-        except (TypeError, ValueError):
-             return Response({'error': 'Debe proporcionar un estado_id válido (int).'}, status=400)
+            token = token.split(' ')[1]
+            UntypedToken(token)
+        except Exception:
+            return Response({"error": "Token inválido o expirado"}, status=401)
 
-        if estado_id not in [1, 2, 3, 4]:
-            return Response({'error': 'Estado no válido. Valores permitidos: 1, 2, 3, 4.'}, status=400)
-        
-        turnos = Turno.objects.filter(estado_id=estado_id).order_by('fecha_turno')
+        puesto = Puesto.objects.filter(token=token, fecha_salida__isnull=True).first()
+        if not puesto:
+            return Response({"error": "No se encontró puesto activo asociado al token"}, status=401)
+
+        ventanilla_id = puesto.id_ventanilla.id
+
+        tz = pytz.timezone('America/Bogota')
+
+        # 🧠 Lógica flexible de fechas
+        try:
+            if fecha_inicio_str:
+                fecha_inicio_dt = make_aware(datetime.combine(datetime.strptime(fecha_inicio_str, "%Y-%m-%d"), time.min), timezone=tz)
+            else:
+                fecha_inicio_dt = make_aware(datetime.combine(datetime.now(tz).date(), time.min), timezone=tz)
+
+            if fecha_fin_str:
+                fecha_fin_dt = make_aware(datetime.combine(datetime.strptime(fecha_fin_str, "%Y-%m-%d"), time.max), timezone=tz)
+            else:
+                # Si solo se pasa fecha_inicio o nada, fin del mismo día
+                fecha_fin_dt = make_aware(datetime.combine(fecha_inicio_dt.date(), time.max), timezone=tz)
+        except ValueError:
+            return Response({"error": "Formato de fecha inválido. Use YYYY-MM-DD."}, status=400)
+
+        # 🔍 Filtro por rango
+        turnos = Turno.objects.filter(fecha_turno__range=(fecha_inicio_dt, fecha_fin_dt))
+
+        if estado_id:
+            try:
+                estado_id = int(estado_id)
+            except ValueError:
+                return Response({'error': 'estado_id debe ser un número entero.'}, status=400)
+
+            if estado_id not in [1, 2, 3, 4]:
+                return Response({'error': 'estado_id no válido. Valores permitidos: 1 a 4'}, status=400)
+
+            turnos = turnos.filter(estado_id=estado_id)
+
+            if estado_id == 1:
+                turnos = turnos.filter(atencion__isnull=True)
+            else:
+                turnos = turnos.filter(atencion__id_ventanilla=ventanilla_id)
+#        else:
+#            turnos = turnos.filter(atencion__id_ventanilla=ventanilla_id)
+
+        turnos = turnos.order_by('fecha_turno')
         serializer = TurnoSerializer(turnos, many=True)
         return Response(serializer.data)
 
