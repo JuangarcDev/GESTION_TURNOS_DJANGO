@@ -52,6 +52,11 @@ class Usuario(models.Model):
     municipio = models.CharField(max_length=100)
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["cedula"]),
+        ]
+
     def __str__(self):
         return f"{self.nombres} - {self.apellidos} - {self.cedula}"
     
@@ -62,6 +67,15 @@ class Turno(models.Model):
     estado = models.ForeignKey(EstadoTurno, on_delete=models.PROTECT)
     tipo_tramite = models.ForeignKey(TipoTramite, on_delete=models.PROTECT)
     fecha_turno = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["estado"]),
+            models.Index(fields=["fecha_turno"]),
+            models.Index(fields=["id_usuario"]),
+            models.Index(fields=["tipo_turno"]),
+            models.Index(fields=["tipo_tramite"]),
+        ]
 
     def __str__(self):
         return f"Turno {self.turno} - {self.estado.nombre}"
@@ -91,6 +105,14 @@ class Atencion(models.Model):
     fecha_atencion = models.DateTimeField(auto_now_add=True)
     fecha_fin_atencion = models.DateTimeField(null=True, blank=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["id_ventanilla"]),
+            models.Index(fields=["id_funcionario"]),
+            models.Index(fields=["fecha_atencion"]),
+            models.Index(fields=["fecha_fin_atencion"]),
+        ]
+
     def __str__(self):
         return f"Atención de {self.id_turno.turno} por {self.id_funcionario.user.get_full_name()}"
  
@@ -101,6 +123,13 @@ class Puesto(models.Model):
     fecha_ingreso = models.DateTimeField(auto_now_add=True)
     fecha_salida = models.DateTimeField(blank=True, null=True)
     token = models.CharField(max_length=255, blank=True, null=True, unique=True)  # NUEVO CAMPO
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["fecha_salida"]),
+            models.Index(fields=["id_ventanilla"]),
+            models.Index(fields=["id_funcionario"]),
+        ]
 
     def __str__(self):
         return f"{self.id_funcionario.user.get_full_name()} - {self.id_ventanilla.nombre}"

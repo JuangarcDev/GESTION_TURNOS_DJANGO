@@ -14,7 +14,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes,
 from django.utils.timezone import now, localtime, make_aware
 from datetime import datetime, time
 import pytz
-from django.db.models import Count, Avg, F, ExpressionWrapper, DurationField
+from django.db.models import Count, Avg, F, ExpressionWrapper, DurationField, Q
 from datetime import datetime, timedelta
 from rest_framework.generics import ListAPIView
 from rest_framework.exceptions import ValidationError, NotFound, APIException, AuthenticationFailed
@@ -141,6 +141,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
                 "success": False,
                 "message": "Ocurrió un error inesperado: " + str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
     #ACA CREAMOS LA PARTE DEL ENDPOINT PERSONALIZADO PARA BUSCAR POR ID DEL ESTADO EL ACTION PARA CREAR EL ENDPOINT Y EL EXTEND PARA PASARLE EL PARAMETRO QUE RECIBE EL ENDPOINT
     @extend_schema(
         parameters=[
@@ -149,67 +150,69 @@ class TurnoViewSet(viewsets.ModelViewSet):
             OpenApiParameter(name='fecha_fin', required=False, type=str, location=OpenApiParameter.QUERY, description='Fecha de fin en formato YYYY-MM-DD'),
         ]
     )
-    @action(detail=False, methods=['get'], url_path='por-estado')
+    @action(detail=False, methods=['get'], url_path='por-estado', permission_classes=[IsAuthenticated])
     def por_estado(self, request):
         estado_id = request.GET.get('estado_id')
         fecha_inicio_str = request.GET.get('fecha_inicio')
         fecha_fin_str = request.GET.get('fecha_fin')
 
-        token = request.headers.get('Authorization')
-        if not token:
+        # 🔐 Validación y extracción del token
+        token_header = request.headers.get('Authorization')
+        if not token_header:
             return Response({"error": "Token requerido en el header Authorization"}, status=400)
 
         try:
-            token = token.split(' ')[1]
+            token = token_header.split(' ')[1]
             UntypedToken(token)
         except Exception:
             return Response({"error": "Token inválido o expirado"}, status=401)
 
-        puesto = Puesto.objects.filter(token=token, fecha_salida__isnull=True).first()
+        # 🚪 Obtener el puesto asociado al token
+        puesto = Puesto.objects.select_related('id_ventanilla').filter(token=token, fecha_salida__isnull=True).first()
         if not puesto:
             return Response({"error": "No se encontró puesto activo asociado al token"}, status=401)
-
+        
         ventanilla_id = puesto.id_ventanilla.id
 
+        # 🧠 Manejo de fechas con timezone
         tz = pytz.timezone('America/Bogota')
-
-        # 🧠 Lógica flexible de fechas
         try:
-            if fecha_inicio_str:
-                fecha_inicio_dt = make_aware(datetime.combine(datetime.strptime(fecha_inicio_str, "%Y-%m-%d"), time.min), timezone=tz)
-            else:
-                fecha_inicio_dt = make_aware(datetime.combine(datetime.now(tz).date(), time.min), timezone=tz)
+            fecha_inicio_dt = make_aware(datetime.combine(
+                datetime.strptime(fecha_inicio_str, "%Y-%m-%d"), time.min
+            ), timezone=tz) if fecha_inicio_str else make_aware(datetime.combine(datetime.now(tz).date(), time.min), timezone=tz)
 
-            if fecha_fin_str:
-                fecha_fin_dt = make_aware(datetime.combine(datetime.strptime(fecha_fin_str, "%Y-%m-%d"), time.max), timezone=tz)
-            else:
-                # Si solo se pasa fecha_inicio o nada, fin del mismo día
-                fecha_fin_dt = make_aware(datetime.combine(fecha_inicio_dt.date(), time.max), timezone=tz)
+            fecha_fin_dt = make_aware(datetime.combine(
+                datetime.strptime(fecha_fin_str, "%Y-%m-%d"), time.max
+            ), timezone=tz) if fecha_fin_str else make_aware(datetime.combine(fecha_inicio_dt.date(), time.max), timezone=tz)
         except ValueError:
             return Response({"error": "Formato de fecha inválido. Use YYYY-MM-DD."}, status=400)
 
-        # 🔍 Filtro por rango
-        turnos = Turno.objects.filter(fecha_turno__range=(fecha_inicio_dt, fecha_fin_dt))
-
+        # 🔍 Filtro compuesto usando Q
+        filtros = Q(fecha_turno__range=(fecha_inicio_dt, fecha_fin_dt))
+        
         if estado_id:
             try:
                 estado_id = int(estado_id)
+                if estado_id not in [1, 2, 3, 4]:
+                    raise ValueError
             except ValueError:
-                return Response({'error': 'estado_id debe ser un número entero.'}, status=400)
+                return Response({'error': 'estado_id no válido. Debe estar entre 1 y 4.'}, status=400)
 
-            if estado_id not in [1, 2, 3, 4]:
-                return Response({'error': 'estado_id no válido. Valores permitidos: 1 a 4'}, status=400)
-
-            turnos = turnos.filter(estado_id=estado_id)
+            filtros &= Q(estado_id=estado_id)
 
             if estado_id == 1:
-                turnos = turnos.filter(atencion__isnull=True)
+                filtros &= Q(atencion__isnull=True)
             else:
-                turnos = turnos.filter(atencion__id_ventanilla=ventanilla_id)
-#        else:
-#            turnos = turnos.filter(atencion__id_ventanilla=ventanilla_id)
+                filtros &= Q(atencion__id_ventanilla=ventanilla_id)
 
-        turnos = turnos.order_by('fecha_turno')
+        # 📦 Consulta optimizada con relaciones cargadas
+        turnos = Turno.objects.select_related(
+            'id_usuario', 'estado', 'tipo_turno', 'tipo_tramite'
+        ).prefetch_related(
+            'atencion__id_funcionario__user',
+            'atencion__id_ventanilla'
+        ).filter(filtros).order_by('fecha_turno')
+
         serializer = TurnoSerializer(turnos, many=True)
         return Response(serializer.data)
 
