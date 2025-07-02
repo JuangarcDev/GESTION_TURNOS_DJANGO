@@ -1,7 +1,7 @@
 from django.db.models.signals import post_migrate, post_save, m2m_changed
 from django.dispatch import receiver
 from django.db import transaction, connection
-from .models import TipoTurno, EstadoTurno, TipoTramite, EstadoVentanilla, Funcionario, Ventanila
+from .models import TipoTurno, EstadoTurno, TipoTramite, EstadoVentanilla, Funcionario, Ventanilla
 
 # IMPORTACIONES PARA AUTH
 from django.contrib.auth.models import User, Group
@@ -18,6 +18,21 @@ def reset_sequence(model, restart_from=None):
                 f"SELECT setval('{sequence_name}', COALESCE((SELECT MAX(id) FROM {table_name}), 1), true);"
             )
 
+def renombrar_secuencia_antigua_si_existe():
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM pg_class WHERE relname = 'turnos_api_ventanila_id_seq'
+                ) THEN
+                    RAISE NOTICE 'Renombrando secuencia antigua ventanila_id_seq a ventanilla_id_seq...';
+                    ALTER SEQUENCE turnos_api_ventanila_id_seq RENAME TO turnos_api_ventanilla_id_seq;
+                END IF;
+            END
+            $$;
+        """)
+
 @receiver(post_migrate)
 def poblar_tablas_dominio(sender, **kwargs):
     if sender.name != "turnos_api":
@@ -26,12 +41,15 @@ def poblar_tablas_dominio(sender, **kwargs):
     with transaction.atomic():
         print("🔄 Poblando tablas de dominio de forma segura...")
 
+        # Renombrar secuencia antigua si quedó con el nombre anterior al rename del modelo
+        renombrar_secuencia_antigua_si_existe()
+        
         # Reiniciar secuencias ANTES de insertar con IDs fijos
         reset_sequence(TipoTurno, restart_from=1)
         reset_sequence(EstadoTurno, restart_from=1)
         reset_sequence(TipoTramite, restart_from=1)
         reset_sequence(EstadoVentanilla, restart_from=1)
-        reset_sequence(Ventanila, restart_from=1)
+        reset_sequence(Ventanilla, restart_from=1)
 
         # Crear grupo Ventanillas si no existe
         grupo_ventanilla, creado = Group.objects.get_or_create(name="Ventanillas")
@@ -81,7 +99,7 @@ def poblar_tablas_dominio(sender, **kwargs):
         # Crear ventanillas por defecto
         estado_libre = EstadoVentanilla.objects.get(nombre='Libre')
         for i in range(1, 6):
-            Ventanila.objects.update_or_create(
+            Ventanilla.objects.update_or_create(
                 id=i,
                 defaults={
                     'nombre': f'Ventanilla {i}',
@@ -94,7 +112,7 @@ def poblar_tablas_dominio(sender, **kwargs):
         reset_sequence(EstadoTurno)
         reset_sequence(TipoTramite)
         reset_sequence(EstadoVentanilla)
-        reset_sequence(Ventanila)
+        reset_sequence(Ventanilla)
 
         print("✅ Tablas de dominio y secuencias configuradas correctamente.")
 

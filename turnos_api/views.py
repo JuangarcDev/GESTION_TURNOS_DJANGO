@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from django.shortcuts import render, get_object_or_404
 from rest_framework import viewsets, status, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla, EstadoTurno
+from .models import Funcionario, Ventanilla, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla, EstadoTurno
 from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer, AsignarVentanillaSerializer, AtenderTurnoSerializer, LogoutSerializer, FinalizarTurnoResponseSerializer, ErrorResponseSerializer, EstadisticasFuncionarioSerializer, EstadisticaLabelValorSerializer
 from .utils import handle_custom_exception
 from .exceptions import CustomAPIException
@@ -68,7 +68,7 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class VentanillaViewSet(viewsets.ModelViewSet):
-    queryset = Ventanila.objects.select_related('estado')  # OPTIMIZACIÓN
+    queryset = Ventanilla.objects.select_related('estado')  # OPTIMIZACIÓN
     serializer_class = VentanillaSerializer
     permission_classes = [IsAuthenticated]
 
@@ -489,7 +489,7 @@ class TipoTurnoListView(BaseListView):
     tags=["Ventanillas"]
 )
 class VentanillaListView(ListAPIView):
-    queryset = Ventanila.objects.all()
+    queryset = Ventanilla.objects.all()
     serializer_class = VentanillaSerializer
     permission_classes = [AllowAny]
 
@@ -527,7 +527,7 @@ class AsignarVentanillaView(APIView):
             })
 
         funcionario = get_object_or_404(Funcionario, id=funcionario_id)
-        ventanilla = get_object_or_404(Ventanila, id=ventanilla_id)
+        ventanilla = get_object_or_404(Ventanilla, id=ventanilla_id)
 
         # Validación de ocupación de la ventanilla
         if ventanilla.estado.nombre == "Ocupada" and not confirmar:
@@ -789,64 +789,56 @@ class EstadisticasFuncionarioView(APIView):
         })
 
 # ENDPOINT PARA CANCELAR TURNOS, SI EL TURNO NO ESTA EN ATENCION, PUEDE CANCELARLO CUALQUIER FUNCIONARIO, EN CASO DE QUE SE ENCUENTRE EN ATENCION UNICAMENTE LO PUEDE CANCELAR EL FUNCIONARIO QUE LO SOLICITO
-@api_view(['POST'])
-@extend_schema(
-    methods=["POST"],
-    responses={
-        200: FinalizarTurnoResponseSerializer,
-        400: ErrorResponseSerializer,
-        401: ErrorResponseSerializer,
-        403: ErrorResponseSerializer,
-    },
-    request=None
-)
-def cancelar_turno(request, turno_id):
-    # Verificar token
-    token = request.headers.get('Authorization')
-    if not token:
-        return Response({"error": "Token requerido."}, status=400)
+class CancelarTurnoView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    try:
-        token = token.split(' ')[1]
-        UntypedToken(token)
-    except (IndexError, AuthenticationFailed):
-        return Response({"error": "Token inválido o expirado."}, status=401)
+    @extend_schema(
+        responses={
+            200: FinalizarTurnoResponseSerializer,
+            400: ErrorResponseSerializer,
+            401: ErrorResponseSerializer,
+            403: ErrorResponseSerializer,
+        },
+        request=None,
+        parameters=[OpenApiParameter(name='turno_id', location=OpenApiParameter.PATH, required=True, type=int)]
+    )
+    def post(self, request, turno_id):
+        token = request.headers.get('Authorization')
+        if not token:
+            return Response({"error": "Token requerido."}, status=400)
 
-    # Obtener puesto activo del funcionario
-    puesto = Puesto.objects.select_related("id_funcionario").filter(token=token, fecha_salida__isnull=True).first()
-    if not puesto:
-        return Response({"error": "Token inválido o sesión terminada."}, status=401)
+        try:
+            token = token.split(' ')[1]
+            UntypedToken(token)
+        except (IndexError, AuthenticationFailed):
+            return Response({"error": "Token inválido o expirado."}, status=401)
 
-    funcionario = puesto.id_funcionario
+        puesto = Puesto.objects.select_related("id_funcionario").filter(token=token, fecha_salida__isnull=True).first()
+        if not puesto:
+            return Response({"error": "Token inválido o sesión terminada."}, status=401)
 
-    # Obtener el turno
-    turno = get_object_or_404(Turno.objects.select_related("estado"), id=turno_id)
-    # Inicializamos la variable ATENCION None, para prevenir errores en caso de turno en espera
-    atencion = None
+        funcionario = puesto.id_funcionario
+        turno = get_object_or_404(Turno.objects.select_related("estado"), id=turno_id)
+        atencion = None
 
-    if turno.estado.nombre == "Espera":
-        # Cualquier funcionario puede cancelar
-        pass
-    elif turno.estado.nombre == "Atención":
-        # Verificamos que el turno esté siendo atendido por este funcionario
-        atencion = Atencion.objects.filter(id_turno=turno, id_funcionario=funcionario).first()
-        if not atencion:
-            return Response({"error": "No tiene permiso para cancelar este turno en atención."}, status=403)
-    else:
-        return Response({"error": f"No se puede cancelar un turno en estado '{turno.estado.nombre}'."}, status=400)
+        if turno.estado.nombre == "Espera":
+            pass
+        elif turno.estado.nombre == "Atención":
+            atencion = Atencion.objects.filter(id_turno=turno, id_funcionario=funcionario).first()
+            if not atencion:
+                return Response({"error": "No tiene permiso para cancelar este turno en atención."}, status=403)
+        else:
+            return Response({"error": f"No se puede cancelar un turno en estado '{turno.estado.nombre}'."}, status=400)
 
-    # Cambiar estado a "Cancelado"
-    estado_cancelado = get_object_or_404(EstadoTurno, nombre="Cancelado")
-    turno.estado = estado_cancelado
-    turno.save()
+        estado_cancelado = get_object_or_404(EstadoTurno, nombre="Cancelado")
+        turno.estado = estado_cancelado
+        turno.save()
 
-    # Registrar la fecha de finalización en este caso de cancelar en caso de que esté en Atención
-    if atencion:
-        atencion.fecha_fin_atencion = timezone.now()
-        atencion.save()
+        if atencion:
+            atencion.fecha_fin_atencion = timezone.now()
+            atencion.save()
 
-    return Response({"message": "Turno cancelado correctamente."}, status=200)
-
+        return Response({"message": "Turno cancelado correctamente."}, status=200)
     # ENDPOINTS PARA EL MODULO DE ESTADISTICAS
 
 # 1 TURNOS POR ESTADO EN UN RANGO DE FECHA PARA EL FUNCIONARIO

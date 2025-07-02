@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     TipoTurno, EstadoTurno, TipoTramite, EstadoVentanilla,
-    Usuario, Turno, Funcionario, Atencion, Ventanila, Puesto, User
+    Usuario, Turno, Funcionario, Atencion, Ventanilla, Puesto, User
 )
 from django.contrib.auth.admin import UserAdmin
 
@@ -98,7 +98,7 @@ class AtencionAdmin(admin.ModelAdmin):
     ordering = ('-fecha_atencion',)
     readonly_fields = ('fecha_atencion',)
 
-@admin.register(Ventanila)
+@admin.register(Ventanilla)
 class VentanilaAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'estado', 'fecha_creacion', 'fecha_edicion')
     search_fields = ('nombre',)

@@ -89,7 +89,7 @@ class Funcionario(models.Model):
     def __str__(self):
         return self.user.get_full_name() or self.user.username
        
-class Ventanila(models.Model):
+class Ventanilla(models.Model):
     nombre = models.CharField(max_length=50, unique=True)
     estado = models.ForeignKey(EstadoVentanilla, on_delete=models.PROTECT)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
@@ -101,7 +101,7 @@ class Ventanila(models.Model):
 class Atencion(models.Model):
     id_funcionario = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name="atenciones")
     id_turno = models.OneToOneField(Turno, on_delete=models.CASCADE, related_name="atencion")
-    id_ventanilla = models.ForeignKey(Ventanila, on_delete=models.PROTECT, related_name="atencion_ventanilla")
+    id_ventanilla = models.ForeignKey(Ventanilla, on_delete=models.PROTECT, related_name="atencion_ventanilla")
     fecha_atencion = models.DateTimeField(auto_now_add=True)
     fecha_fin_atencion = models.DateTimeField(null=True, blank=True)
 
@@ -119,7 +119,7 @@ class Atencion(models.Model):
     
 class Puesto(models.Model):
     id_funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE, related_name="puestos")
-    id_ventanilla = models.ForeignKey(Ventanila, on_delete=models.CASCADE, related_name="puestos")
+    id_ventanilla = models.ForeignKey(Ventanilla, on_delete=models.CASCADE, related_name="puestos")
     fecha_ingreso = models.DateTimeField(auto_now_add=True)
     fecha_salida = models.DateTimeField(blank=True, null=True)
     token = models.CharField(max_length=255, blank=True, null=True, unique=True)  # NUEVO CAMPO

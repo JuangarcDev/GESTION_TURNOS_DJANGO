@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from.models import Funcionario, Ventanila, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla, EstadoTurno
+from.models import Funcionario, Ventanilla, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla, EstadoTurno
 from drf_spectacular.utils import extend_schema_field
 
 class FuncionarioSerializer(serializers.ModelSerializer):
@@ -12,7 +12,7 @@ class VentanillaSerializer(serializers.ModelSerializer):
     nombre_estado = serializers.CharField(source='estado.nombre', read_only=True)
 
     class Meta:
-        model = Ventanila
+        model = Ventanilla
         fields = [
             'id',
             'nombre',
