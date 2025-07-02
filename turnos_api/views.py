@@ -565,19 +565,21 @@ class AsignarVentanillaView(APIView):
 # ENDPOINT PARA ATENDER TURNO. FUNCIONARIO - TOKEN - PUESTO
 @extend_schema(
     methods=["POST"],
-    request=AtenderTurnoSerializer,
+    request=None,
     responses={
-        200: OpenApiResponse(description="Turno atendido con éxito."),
-        400: OpenApiResponse(description="Turno no disponible o atención duplicada."),
-        401: OpenApiResponse(description="Token inválido o expirado."),
+        200: FinalizarTurnoResponseSerializer,
+        400: ErrorResponseSerializer,
+        401: ErrorResponseSerializer,
+        403: ErrorResponseSerializer,
     },
 )
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def atender_turno(request, turno_id):
+def gestionar_turno(request):
     token_header = request.headers.get('Authorization', '')
     token = token_header.split(' ')[1] if token_header.startswith('Bearer ') else None
-
+    print(f"\n🔑 TOKEN RECIBIDO: {token}")
+    
     if not token:
         return Response({"error": "Token requerido."}, status=400)
 
@@ -586,82 +588,92 @@ def atender_turno(request, turno_id):
     except AuthenticationFailed:
         return Response({"error": "Token inválido o expirado."}, status=401)
 
-    try:
-        puesto = Puesto.objects.get(token=token, fecha_salida__isnull=True)
-    except Puesto.DoesNotExist:
+    # Obtener puesto activo
+    puesto = Puesto.objects.select_related("id_funcionario", "id_ventanilla").filter(
+        token=token, fecha_salida__isnull=True
+    ).first()
+    
+    if not puesto:
+        print("❌ No se encontró puesto activo.")
         return Response({"error": "Token inválido o sesión terminada."}, status=401)
 
-    # Verificar si ya hay una atención activa del funcionario
-    if Atencion.objects.filter(id_funcionario=puesto.id_funcionario, id_turno__estado__nombre='Atención').exists():
-        return Response({"error": "Ya existe un turno en atención. Debe finalizarlo antes."}, status=400)
+    funcionario = puesto.id_funcionario
+    ventanilla = puesto.id_ventanilla
+    print(f"✅ FUNCIONARIO: {funcionario}, VENTANILLA: {ventanilla}")
 
-    turno = get_object_or_404(Turno, id=turno_id)
+    # --- FINALIZAR TURNO EN ATENCION ---
+    atencion_activa = Atencion.objects.select_related("id_turno").filter(
+        id_funcionario=funcionario,
+        id_ventanilla=ventanilla,
+        id_turno__estado__nombre="Atención"
+    ).first()
 
-    if turno.estado.nombre != "Espera":
-        return Response({"error": "El turno no está disponible para ser atendido."}, status=400)
+    if atencion_activa:
+        turno_activo = atencion_activa.id_turno
+        print(f"✔️ Finalizando turno en atención: {turno_activo.turno}")
+        estado_finalizado = EstadoTurno.objects.get(nombre="Finalizado")
+        turno_activo.estado = estado_finalizado
+        turno_activo.save()
+        atencion_activa.fecha_fin_atencion = timezone.now()
+        atencion_activa.save()
+    else:
+        print("ℹ️ No había turno en atención para finalizar.")
 
-    # Cambiar estado del turno a EN ATENCION
-    estado_en_atencion = get_object_or_404(EstadoTurno, nombre="Atención")
-    turno.estado = estado_en_atencion
-    turno.save()
+    # --- BUSCAR TURNO MAS PRIORITARIO ---
+    ahora = timezone.now()
 
-    atencion = Atencion.objects.create(
-        id_funcionario=puesto.id_funcionario,
-        id_turno=turno,
-        id_ventanilla=puesto.id_ventanilla,
-        fecha_atencion=localtime()
+    turnos_disponibles = Turno.objects.select_related("tipo_tramite", "estado").filter(
+        estado__nombre="Espera"
+    )
+
+    if not turnos_disponibles.exists():
+        print("❌ No hay turnos disponibles en espera.")
+        return Response({"error": "No hay turnos disponibles para atender."}, status=400)
+
+    def calcular_prioridad(fecha_turno, tiempo_estimado_minutos, ahora):
+        """
+        Calcula el porcentaje de agotamiento del tiempo estimado para un turno.
+        Cuanto más alto el porcentaje, más tiempo ha pasado desde que se generó el turno.
+
+        :param fecha_turno: datetime de cuando se generó el turno
+        :param tiempo_estimado_minutos: duración máxima estimada del turno (en minutos)
+        :param ahora: datetime actual
+        :return: porcentaje (float entre 0 y 1) — mayor = más próximo a agotarse
+        """
+        transcurrido = (ahora - fecha_turno).total_seconds() / 60  # en minutos
+        if tiempo_estimado_minutos == 0:
+            return 1  # Evita división por cero; considera agotado completamente
+        return transcurrido / tiempo_estimado_minutos
+
+    def calcular_porcentaje(turno):
+        tiempo_estimado = getattr(turno, 'tiempo_estimado_maximo', 25)
+        prioridad = calcular_prioridad(turno.fecha_turno, tiempo_estimado, ahora)
+        print(f"🔢 Turno {turno.turno} - Prioridad: {prioridad:.2f}")
+        return prioridad
+    
+    turnos_ordenados = sorted(turnos_disponibles, key=calcular_porcentaje, reverse=True)
+
+    turno_prioritario = turnos_ordenados[0]
+    print(f"🎯 Turno seleccionado para atención: {turno_prioritario.turno}")
+
+    # Cambiar estado a "Atención"
+    estado_atencion = EstadoTurno.objects.get(nombre="Atención")
+    turno_prioritario.estado = estado_atencion
+    turno_prioritario.save()
+
+    nueva_atencion = Atencion.objects.create(
+        id_funcionario=funcionario,
+        id_turno=turno_prioritario,
+        id_ventanilla=ventanilla,
+        fecha_atencion=ahora
     )
 
     return Response({
-        "message": "Turno atendido con éxito",
-        "atencion_id": atencion.id
+        "message": "Turno finalizado (si existía uno) y nuevo turno atendido.",
+        "turno_id": turno_prioritario.id,
+        "turno_codigo": turno_prioritario.turno,
+        "atencion_id": nueva_atencion.id
     })
-
-# ENPOINT PARA FINALIZAR ATENCION DE TURNO.
-@extend_schema(
-    request=None,
-    responses={
-        200: FinalizarTurnoResponseSerializer,
-        400: ErrorResponseSerializer,
-        401: ErrorResponseSerializer,
-        403: ErrorResponseSerializer,
-    }
-)
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def finalizar_turno(request, turno_id):
-    token_header = request.headers.get('Authorization', '')
-    token = token_header.split(' ')[1] if token_header.startswith('Bearer ') else None
-    if not token:
-        return Response({"error": "Token requerido."}, status=400)
-
-    try:
-        UntypedToken(token)
-    except (IndexError, AuthenticationFailed):
-        return Response({"error": "Token inválido o mal formado."}, status=401)
-
-    puesto = Puesto.objects.filter(token=token, fecha_salida__isnull=True).first()
-    if not puesto:
-        return Response({"error": "Token inválido o sesión terminada."}, status=401)
-
-    turno = get_object_or_404(Turno, id=turno_id)
-    if turno.estado.nombre != "Atención":
-        return Response({"error": "Este turno no está en atención actualmente."}, status=400)
-
-    atencion = Atencion.objects.filter(id_turno=turno, id_funcionario=puesto.id_funcionario).first()
-    if not atencion:
-        return Response({"error": "Este turno no está siendo atendido por usted."}, status=403)
-
-    try:
-        turno.estado = EstadoTurno.objects.get(nombre="Finalizado")
-    except EstadoTurno.DoesNotExist:
-        return Response({"error": "Estado 'Finalizado' no encontrado."}, status=500)
-
-    turno.save()
-    atencion.fecha_fin_atencion = timezone.now()
-    atencion.save()
-
-    return Response({"message": "Turno finalizado correctamente."})
 
 #ENDPOINT DE LOGOUT
 
