@@ -622,14 +622,27 @@ def gestionar_turno(request):
     # --- BUSCAR TURNO MAS PRIORITARIO ---
     ahora = timezone.now()
 
+    # ¿Es ventanilla de productos?
+    es_ventanilla_productos = 'prod' in ventanilla.nombre.lower()
+
+    print(f"🧭 Ventanilla '{ventanilla.nombre}' es de productos: {es_ventanilla_productos}")
+
+    # Filtrar turnos disponibles
     turnos_disponibles = Turno.objects.select_related("tipo_tramite", "estado").filter(
         estado__nombre="Espera"
     )
 
+    # Filtrar según tipo de ventanilla y letra del turno
+    if es_ventanilla_productos:
+        turnos_disponibles = turnos_disponibles.filter(turno__istartswith='E')
+    else:
+        turnos_disponibles = turnos_disponibles.exclude(turno__istartswith='E')
+
     if not turnos_disponibles.exists():
-        print("❌ No hay turnos disponibles en espera.")
+        print("❌ No hay turnos disponibles en espera (tras filtrar por ventanilla).")
         return Response({"error": "No hay turnos disponibles para atender."}, status=400)
 
+    # Ordenar por urgencia
     def calcular_porcentaje(turno):
         """
         Calcula el porcentaje de agotamiento del tiempo estimado para un turno.
@@ -664,7 +677,7 @@ def gestionar_turno(request):
         return porcentaje
     
     turnos_ordenados = sorted(turnos_disponibles, key=calcular_porcentaje, reverse=True)
-
+    
     turno_prioritario = turnos_ordenados[0]
     print(f"🎯 Turno seleccionado para atención: {turno_prioritario.turno}")
 
