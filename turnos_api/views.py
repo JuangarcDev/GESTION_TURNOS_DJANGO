@@ -630,7 +630,7 @@ def gestionar_turno(request):
         print("❌ No hay turnos disponibles en espera.")
         return Response({"error": "No hay turnos disponibles para atender."}, status=400)
 
-    def calcular_prioridad(fecha_turno, tiempo_estimado_minutos, ahora):
+    def calcular_porcentaje(turno):
         """
         Calcula el porcentaje de agotamiento del tiempo estimado para un turno.
         Cuanto más alto el porcentaje, más tiempo ha pasado desde que se generó el turno.
@@ -639,17 +639,29 @@ def gestionar_turno(request):
         :param tiempo_estimado_minutos: duración máxima estimada del turno (en minutos)
         :param ahora: datetime actual
         :return: porcentaje (float entre 0 y 1) — mayor = más próximo a agotarse
-        """
-        transcurrido = (ahora - fecha_turno).total_seconds() / 60  # en minutos
-        if tiempo_estimado_minutos == 0:
-            return 1  # Evita división por cero; considera agotado completamente
-        return transcurrido / tiempo_estimado_minutos
+        """    
+        # Obtener tiempo estimado según tipo de turno
+        if turno.tipo_turno.nombre.lower() == 'prioritario' or turno.tipo_turno.id == 1:
+            tiempo_estimado = 15
+        elif turno.tipo_turno.nombre.lower() == 'general' or turno.tipo_turno.id == 2:
+            tiempo_estimado = turno.tipo_tramite.tiempo_espera
+        else:
+            tiempo_estimado = 25  # Valor por defecto de seguridad
 
-    def calcular_porcentaje(turno):
-        tiempo_estimado = getattr(turno, 'tiempo_estimado_maximo', 25)
-        prioridad = calcular_prioridad(turno.fecha_turno, tiempo_estimado, ahora)
-        print(f"🔢 Turno {turno.turno} - Prioridad: {prioridad:.2f}")
-        return prioridad
+        transcurrido = (ahora - turno.fecha_turno).total_seconds() / 60  # en minutos
+
+        porcentaje = transcurrido / tiempo_estimado if tiempo_estimado != 0 else 1
+
+        print(
+            f"📌 Turno {turno.turno} | Tipo turno: {turno.tipo_turno.nombre} | "
+            f"Trámite: {turno.tipo_tramite.nombre} | "
+            f"Fecha turno: {turno.fecha_turno.strftime('%H:%M:%S')} | "
+            f"Transcurrido: {transcurrido:.2f} min | "
+            f"Estimado: {tiempo_estimado} min | "
+            f"Prioridad (%): {porcentaje:.2f}"
+        )
+
+        return porcentaje
     
     turnos_ordenados = sorted(turnos_disponibles, key=calcular_porcentaje, reverse=True)
 
