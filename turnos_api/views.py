@@ -622,22 +622,28 @@ def gestionar_turno(request):
     # --- BUSCAR TURNO MAS PRIORITARIO ---
     ahora = timezone.now()
 
+    # ¿Hay ventanillas de productos en el sistema?
+    existe_ventanilla_productos = Ventanilla.objects.filter(nombre__icontains='prod').exists()
     # ¿Es ventanilla de productos?
     es_ventanilla_productos = 'prod' in ventanilla.nombre.lower()
 
-    print(f"🧭 Ventanilla '{ventanilla.nombre}' es de productos: {es_ventanilla_productos}")
+    print(f"🧭 Existen ventanillas de productos: {existe_ventanilla_productos}")
+    print(f"🔎 Ventanilla actual '{ventanilla.nombre}' es de productos: {es_ventanilla_productos}")
 
     # Filtrar turnos disponibles
     turnos_disponibles = Turno.objects.select_related("tipo_tramite", "estado").filter(
         estado__nombre="Espera"
     )
 
-    # Filtrar según tipo de ventanilla y letra del turno
-    if es_ventanilla_productos:
-        turnos_disponibles = turnos_disponibles.filter(turno__istartswith='E')
-    else:
-        turnos_disponibles = turnos_disponibles.exclude(turno__istartswith='E')
+    # Aplicar lógica según existencia de ventanillas de productos
+    if existe_ventanilla_productos:
+        # Si existen ventanillas de productos, filtrar turnos por letra según tipo de ventanilla
+        if es_ventanilla_productos:
+            turnos_disponibles = turnos_disponibles.filter(turno__istartswith='E')
+        else:
+            turnos_disponibles = turnos_disponibles.exclude(turno__istartswith='E')
 
+# Si no hay turnos aplicables, retornar error
     if not turnos_disponibles.exists():
         print("❌ No hay turnos disponibles en espera (tras filtrar por ventanilla).")
         return Response({"error": "No hay turnos disponibles para atender."}, status=400)
@@ -675,7 +681,8 @@ def gestionar_turno(request):
         )
 
         return porcentaje
-    
+
+    # Ordenar los turnos
     turnos_ordenados = sorted(turnos_disponibles, key=calcular_porcentaje, reverse=True)
     
     turno_prioritario = turnos_ordenados[0]
@@ -740,16 +747,42 @@ class LogoutView(APIView):
             return Response({"error": "Access token inválido."}, status=401)
         
         # Buscar puesto activo con ese access token
+        # Paso 3: Obtener el puesto activo del funcionario
         puesto = Puesto.objects.filter(token=access_token, fecha_salida__isnull=True).first()
         if puesto:
+            funcionario = puesto.id_funcionario
+            ventanilla = puesto.id_ventanilla
+
+            print(f"🔍 Verificando atenciones activas para funcionario: {funcionario} y ventanilla: {ventanilla}")
+
+            # Paso 4: Finalizar turnos en atención activos antes de cerrar sesión
+            atenciones_activas = Atencion.objects.select_related("id_turno").filter(
+                id_funcionario=funcionario,
+                id_ventanilla=ventanilla,
+                fecha_fin_atencion__isnull=True
+            )
+
+            estado_finalizado = EstadoTurno.objects.get(id=3)  # También puedes usar nombre="Finalizado"
+
+            for atencion in atenciones_activas:
+                atencion.fecha_fin_atencion = timezone.now()
+                atencion.save()
+
+                turno = atencion.id_turno
+                turno.estado = estado_finalizado
+                turno.save()
+
+                print(f"✅ Turno {turno.turno} finalizado automáticamente en logout.")
+
+            # Paso 5: Cerrar puesto (liberar ventanilla)
             puesto.fecha_salida = timezone.now()
-            puesto.token = None  # Limpia el token asociado
+            puesto.token = None
             puesto.save()
 
             try:
                 estado_libre = EstadoVentanilla.objects.get(nombre="Libre")
-                puesto.id_ventanilla.estado = estado_libre
-                puesto.id_ventanilla.save()
+                ventanilla.estado = estado_libre
+                ventanilla.save()
             except EstadoVentanilla.DoesNotExist:
                 return Response({"error": "Estado 'Libre' no definido."}, status=500)
 
