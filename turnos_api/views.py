@@ -11,7 +11,7 @@ from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSeria
 from .utils import handle_custom_exception
 from .exceptions import CustomAPIException
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes, OpenApiExample, OpenApiResponse, extend_schema_view
-from django.utils.timezone import now, localtime, make_aware
+from django.utils.timezone import now, localtime, make_aware, timedelta
 from datetime import datetime, time
 import pytz
 from django.db.models import Count, Avg, F, ExpressionWrapper, DurationField, Q
@@ -106,12 +106,32 @@ class TurnoViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         data = request.data.copy()
 
+        # Validar ID de usuario
+        id_usuario = data.get('id_usuario')
+        if not id_usuario:
+            return Response({'error': 'Se requiere el id_usuario para crear el turno.'}, status=400)
+
+        # Validar turnos recientes en los últimos 2 minutos
+        hace_dos_min = now() - timedelta(minutes=2)
+        turno_reciente = Turno.objects.filter(
+            id_usuario_id=id_usuario,
+            fecha_turno__gte=hace_dos_min
+        ).exists()
+
+        if turno_reciente:
+            return Response({
+                'error': 'Ya tienes un turno registrado en los últimos 2 minutos. Por favor, espera un momento antes de pedir otro.'
+            }, status=400)
+
+        # Valor por defecto para fecha_turno
         if 'fecha_turno' not in data or not data['fecha_turno']:
             data['fecha_turno'] = localtime()
 
+        # Valor por defecto para estado
         if 'estado' not in data or not data['estado']:
             data['estado'] = 1
 
+        # Generación automática del código de turno
         if 'turno' not in data or not data['turno']:
             try:
                 tramite_id = int(data['tipo_tramite'])
@@ -126,6 +146,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
             except Exception as e:
                 return Response({'error': f'Error generando el nombre del turno: {str(e)}'}, status=400)
 
+        # Serialización y guardado
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
