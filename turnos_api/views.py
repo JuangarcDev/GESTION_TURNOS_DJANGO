@@ -599,7 +599,7 @@ class AsignarVentanillaView(APIView):
 def gestionar_turno(request):
     token_header = request.headers.get('Authorization', '')
     token = token_header.split(' ')[1] if token_header.startswith('Bearer ') else None
-    print(f"\n🔑 TOKEN RECIBIDO: {token}")
+    #print(f"\n🔑 TOKEN RECIBIDO: {token}")
     
     if not token:
         return Response({"error": "Token requerido."}, status=400)
@@ -615,12 +615,12 @@ def gestionar_turno(request):
     ).first()
     
     if not puesto:
-        print("❌ No se encontró puesto activo.")
+        #print("❌ No se encontró puesto activo.")
         return Response({"error": "Token inválido o sesión terminada."}, status=401)
 
     funcionario = puesto.id_funcionario
     ventanilla = puesto.id_ventanilla
-    print(f"✅ FUNCIONARIO: {funcionario}, VENTANILLA: {ventanilla}")
+    #print(f"✅ FUNCIONARIO: {funcionario}, VENTANILLA: {ventanilla}")
 
     # --- FINALIZAR TURNO EN ATENCION ---
     atencion_activa = Atencion.objects.select_related("id_turno").filter(
@@ -631,7 +631,7 @@ def gestionar_turno(request):
 
     if atencion_activa:
         turno_activo = atencion_activa.id_turno
-        print(f"✔️ Finalizando turno en atención: {turno_activo.turno}")
+        #print(f"✔️ Finalizando turno en atención: {turno_activo.turno}")
         estado_finalizado = EstadoTurno.objects.get(nombre="Finalizado")
         turno_activo.estado = estado_finalizado
         turno_activo.save()
@@ -648,8 +648,8 @@ def gestionar_turno(request):
     # ¿Es ventanilla de productos?
     es_ventanilla_productos = 'prod' in ventanilla.nombre.lower()
 
-    print(f"🧭 Existen ventanillas de productos: {existe_ventanilla_productos}")
-    print(f"🔎 Ventanilla actual '{ventanilla.nombre}' es de productos: {es_ventanilla_productos}")
+    #print(f"🧭 Existen ventanillas de productos: {existe_ventanilla_productos}")
+    #print(f"🔎 Ventanilla actual '{ventanilla.nombre}' es de productos: {es_ventanilla_productos}")
 
     # Filtrar turnos disponibles
     turnos_disponibles = Turno.objects.select_related("tipo_tramite", "estado").filter(
@@ -666,7 +666,7 @@ def gestionar_turno(request):
 
 # Si no hay turnos aplicables, retornar error
     if not turnos_disponibles.exists():
-        print("❌ No hay turnos disponibles en espera (tras filtrar por ventanilla).")
+        #print("❌ No hay turnos disponibles en espera (tras filtrar por ventanilla).")
         return Response({"error": "No hay turnos disponibles para atender."}, status=400)
 
     # Ordenar por urgencia
@@ -692,14 +692,14 @@ def gestionar_turno(request):
 
         porcentaje = transcurrido / tiempo_estimado if tiempo_estimado != 0 else 1
 
-        print(
-            f"📌 Turno {turno.turno} | Tipo turno: {turno.tipo_turno.nombre} | "
-            f"Trámite: {turno.tipo_tramite.nombre} | "
-            f"Fecha turno: {turno.fecha_turno.strftime('%H:%M:%S')} | "
-            f"Transcurrido: {transcurrido:.2f} min | "
-            f"Estimado: {tiempo_estimado} min | "
-            f"Prioridad (%): {porcentaje:.2f}"
-        )
+        #print(
+        #    f"📌 Turno {turno.turno} | Tipo turno: {turno.tipo_turno.nombre} | "
+        #    f"Trámite: {turno.tipo_tramite.nombre} | "
+        #    f"Fecha turno: {turno.fecha_turno.strftime('%H:%M:%S')} | "
+        #    f"Transcurrido: {transcurrido:.2f} min | "
+        #    f"Estimado: {tiempo_estimado} min | "
+        #    f"Prioridad (%): {porcentaje:.2f}"
+        #)
 
         return porcentaje
 
@@ -707,7 +707,7 @@ def gestionar_turno(request):
     turnos_ordenados = sorted(turnos_disponibles, key=calcular_porcentaje, reverse=True)
     
     turno_prioritario = turnos_ordenados[0]
-    print(f"🎯 Turno seleccionado para atención: {turno_prioritario.turno}")
+    #print(f"🎯 Turno seleccionado para atención: {turno_prioritario.turno}")
 
     # Cambiar estado a "Atención"
     estado_atencion = EstadoTurno.objects.get(nombre="Atención")
