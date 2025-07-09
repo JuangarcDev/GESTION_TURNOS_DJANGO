@@ -366,12 +366,24 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         except Usuario.DoesNotExist:
             return Response({'success': False, 'message': 'No se encontró ningún usuario con la cédula proporcionada.'}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = self.get_serializer(usuario)
-        return Response({
+        # Validar si el usuario tiene un turno en los últimos 2 minutos
+        hace_dos_min = now() - timedelta(minutes=2)
+        turno_reciente = Turno.objects.filter(
+            id_usuario=usuario.id,
+            fecha_turno__gte=hace_dos_min
+        ).exists()
+
+        # Respuesta con advertencia si aplica
+        response_data = {
             'success': True,
             'message': 'Usuario encontrado exitosamente.',
-            'data': serializer.data
-        }, status=status.HTTP_200_OK)
+            'data': self.get_serializer(usuario).data
+        }
+
+        if turno_reciente:
+            response_data['warning'] = 'Este usuario ya tiene un turno generado en los últimos 2 minutos. Espere un momento antes de solicitar otro.'
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 class AtencionViewSet(viewsets.ModelViewSet):
     queryset = Atencion.objects.all()
