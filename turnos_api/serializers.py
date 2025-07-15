@@ -1,7 +1,26 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 from.models import Funcionario, Ventanilla, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla, EstadoTurno
 from drf_spectacular.utils import extend_schema_field
+
+# SERIALIZADOR DEL USUARIO
+class UserSerializer(serializers.ModelSerializer):
+    groups = serializers.SlugRelatedField(
+        many=True,
+        read_only=True,
+        slug_field='name'
+    )
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'groups']
+
+class FuncionarioDetalleSerializer(serializers.ModelSerializer):
+    user = UserSerializer()  # Incluye los grupos
+
+    class Meta:
+        model = Funcionario
+        fields = ['id', 'user', 'telefono', 'fecha_creacion', 'fecha_edicion']
 
 class FuncionarioSerializer(serializers.ModelSerializer):
     class Meta:

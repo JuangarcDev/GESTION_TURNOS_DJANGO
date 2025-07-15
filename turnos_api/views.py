@@ -7,7 +7,7 @@ from django.shortcuts import render, get_object_or_404
 from rest_framework import viewsets, status, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Funcionario, Ventanilla, Turno, Usuario, Atencion, Puesto, TipoTramite, TipoTurno, EstadoVentanilla, EstadoTurno
-from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer, AsignarVentanillaSerializer, AtenderTurnoSerializer, LogoutSerializer, FinalizarTurnoResponseSerializer, ErrorResponseSerializer, EstadisticasFuncionarioSerializer, EstadisticaLabelValorSerializer
+from .serializers import FuncionarioSerializer, VentanillaSerializer, TurnoSerializer, UsuarioSerializer, AtencionSerializer, PuestoSerializer, UsuarioAutenticadoSerializer, TipoTramiteSerializer, TipoTurnoSerializer, AsignarVentanillaSerializer, AtenderTurnoSerializer, LogoutSerializer, FinalizarTurnoResponseSerializer, ErrorResponseSerializer, EstadisticasFuncionarioSerializer, EstadisticaLabelValorSerializer, FuncionarioDetalleSerializer
 from .utils import handle_custom_exception
 from .exceptions import CustomAPIException
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes, OpenApiExample, OpenApiResponse, extend_schema_view
@@ -942,8 +942,32 @@ class CancelarTurnoView(APIView):
             atencion.save()
 
         return Response({"message": "Turno cancelado correctamente."}, status=200)
-    # ENDPOINTS PARA EL MODULO DE ESTADISTICAS
 
+# ENDPOINT PARA LISTAR LOS USER QUE SON DE TIPO VENTANILLA CON LOS DATOS BASICOS DE LOS MISMOS
+@extend_schema(
+    summary="Listar funcionarios del grupo Ventanillas (o que pertenezcan también a otros)",
+    responses={200: FuncionarioDetalleSerializer(many=True)},
+    tags=["Funcionarios"]
+)
+class ListaFuncionariosVentanillaView(APIView):
+    def get(self, request):
+        try:
+            # Usuarios que estén en el grupo "Ventanillas"
+            usuarios_ventanilla_ids = User.objects.filter(groups__name='Ventanillas').values_list('id', flat=True)
+            
+            # Filtrar funcionarios relacionados con esos usuarios
+            funcionarios = Funcionario.objects.select_related('user').filter(user__id__in=usuarios_ventanilla_ids)
+            
+            serializer = FuncionarioDetalleSerializer(funcionarios, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response(
+                {"error": f"Ocurrió un error al obtener los funcionarios: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+# ENDPOINTS PARA EL MODULO DE ESTADISTICAS
 # 1 TURNOS POR ESTADO EN UN RANGO DE FECHA PARA EL FUNCIONARIO
 @extend_schema(
     summary="Cantidad de turnos por estado atendidos por funcionario",
@@ -977,7 +1001,7 @@ class TurnosPorEstadoView(APIView):
             return Response({'detail': 'El usuario no es un funcionario válido'}, status=403)
 
         # Obtener atenciones según grupo
-        if user.groups.filter(name="Supervisores").exists():
+        if user.groups.filter(name="Supervisor").exists():
             #print("🧭 Usuario es SUPERVISOR: verá todas las atenciones en el rango")
             atenciones = Atencion.objects.filter(fecha_atencion__range=(inicio, fin))
         elif user.groups.filter(name="Ventanillas").exists():
@@ -1034,7 +1058,7 @@ class TurnosPorHoraDiaView(APIView):
         if user.groups.filter(name="Ventanillas").exists():
             funcionario = Funcionario.objects.get(user=user)
             queryset = queryset.filter(atencion__id_funcionario=funcionario)
-        elif not user.groups.filter(name="Supervisores").exists():
+        elif not user.groups.filter(name="Supervisor").exists():
             return Response({"error": "Usuario no autorizado"}, status=403)
 
         if agrupacion == "hora":
@@ -1077,7 +1101,7 @@ class TurnosPorTramiteView(APIView):
         if user.groups.filter(name="Ventanillas").exists():
             funcionario = Funcionario.objects.get(user=user)
             queryset = queryset.filter(atencion__id_funcionario=funcionario)
-        elif not user.groups.filter(name="Supervisores").exists():
+        elif not user.groups.filter(name="Supervisor").exists():
             return Response({"error": "Usuario no autorizado"}, status=403)
 
         data = queryset.values("tipo_tramite__nombre").annotate(total=Count("id"))
@@ -1118,7 +1142,7 @@ class PromedioAtencionPorTramiteView(APIView):
         if user.groups.filter(name="Ventanillas").exists():
             funcionario = Funcionario.objects.get(user=user)
             queryset = queryset.filter(id_funcionario=funcionario)
-        elif not user.groups.filter(name="Supervisores").exists():
+        elif not user.groups.filter(name="Supervisor").exists():
             return Response({"error": "Usuario no autorizado"}, status=403)
 
         data = queryset.values("id_turno__tipo_tramite__nombre").annotate(promedio=Avg("duracion"))
@@ -1170,7 +1194,7 @@ class TotalesGeneralesView(APIView):
             funcionario = Funcionario.objects.get(user=user)
             queryset = queryset.filter(id_funcionario=funcionario)
             #print(f" Funcionario filtrado: {funcionario}")
-        elif not user.groups.filter(name="Supervisores").exists():
+        elif not user.groups.filter(name="Supervisor").exists():
             return Response({"error": "Usuario no autorizado"}, status=403)
 
         total_turnos = queryset.count()
