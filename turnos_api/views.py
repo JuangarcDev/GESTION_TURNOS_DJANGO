@@ -1097,7 +1097,8 @@ class TurnosPorHoraDiaView(APIView):
     summary="Cantidad de turnos por tipo de trámite",
     parameters=[
         OpenApiParameter(name='inicio', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True),
-        OpenApiParameter(name='fin', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True)
+        OpenApiParameter(name='fin', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True),
+        OpenApiParameter(name='id_funcionario', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY, required=False, description="ID del funcionario (opcional, solo para supervisores)")
     ],
     responses=EstadisticaLabelValorSerializer(many=True),
     tags=["Estadísticas"]
@@ -1108,17 +1109,22 @@ class TurnosPorTramiteView(APIView):
     def get(self, request):
         fecha_inicio = request.GET.get("inicio")
         fecha_fin = request.GET.get("fin")
-        user = request.user
+        id_funcionario_param = request.GET.get("id_funcionario")
 
         try:
             inicio = make_aware(datetime.strptime(fecha_inicio, "%Y-%m-%d"))
             fin = make_aware(datetime.strptime(fecha_fin, "%Y-%m-%d")) + timedelta(days=1)
-        except:
-            return Response({"error": "Formato de fecha inválido."}, status=400)
+        except Exception:
+            return Response({"error": "Formato de fecha inválido. Use YYYY-MM-DD"}, status=400)
 
-        funcionario = obtener_funcionario_para_estadisticas(request)
-        if funcionario == "NO_AUTORIZADO":
-            return Response({"error": "Usuario no autorizado"}, status=403)
+        es_supervisor = request.user.groups.filter(name="Supervisor").exists()
+
+        if id_funcionario_param and es_supervisor:
+            funcionario = id_funcionario_param
+        else:
+            funcionario = obtener_funcionario_para_estadisticas(request)
+            if funcionario == "NO_AUTORIZADO":
+                return Response({"error": "Usuario no autorizado"}, status=403)
 
         queryset = Turno.objects.filter(fecha_turno__range=(inicio, fin))
         if funcionario:
@@ -1133,7 +1139,8 @@ class TurnosPorTramiteView(APIView):
     summary="Tiempo promedio de atención por tipo de trámite",
     parameters=[
         OpenApiParameter(name='inicio', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True),
-        OpenApiParameter(name='fin', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True)
+        OpenApiParameter(name='fin', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True),
+        OpenApiParameter(name='id_funcionario', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY, required=False, description="ID del funcionario (opcional, solo para supervisores)")
     ],
     responses=EstadisticaLabelValorSerializer(many=True),
     tags=["Estadísticas"]
@@ -1144,7 +1151,7 @@ class PromedioAtencionPorTramiteView(APIView):
     def get(self, request):
         fecha_inicio = request.GET.get("inicio")
         fecha_fin = request.GET.get("fin")
-        user = request.user
+        id_funcionario_param = request.GET.get("id_funcionario")
 
         try:
             inicio = make_aware(datetime.strptime(fecha_inicio, "%Y-%m-%d"))
@@ -1152,16 +1159,25 @@ class PromedioAtencionPorTramiteView(APIView):
         except:
             return Response({"error": "Formato de fecha inválido."}, status=400)
 
-        funcionario = obtener_funcionario_para_estadisticas(request)
-        if funcionario == "NO_AUTORIZADO":
-            return Response({"error": "Usuario no autorizado"}, status=403)
+        es_supervisor = request.user.groups.filter(name="Supervisor").exists()
+
+        if id_funcionario_param and es_supervisor:
+            funcionario = id_funcionario_param
+        else:
+            funcionario = obtener_funcionario_para_estadisticas(request)
+            if funcionario == "NO_AUTORIZADO":
+                return Response({"error": "Usuario no autorizado"}, status=403)
 
         queryset = Atencion.objects.filter(
             fecha_atencion__range=(inicio, fin),
             fecha_fin_atencion__isnull=False
         ).annotate(
-            duracion=ExpressionWrapper(F('fecha_fin_atencion') - F('fecha_atencion'), output_field=DurationField())
+            duracion=ExpressionWrapper(
+                F('fecha_fin_atencion') - F('fecha_atencion'),
+                output_field=DurationField()
+            )
         )
+
         if funcionario:
             queryset = queryset.filter(id_funcionario=funcionario)
 
@@ -1177,7 +1193,8 @@ class PromedioAtencionPorTramiteView(APIView):
     summary="Totales: cantidad de turnos y tiempo promedio",
     parameters=[
         OpenApiParameter(name='inicio', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True),
-        OpenApiParameter(name='fin', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True)
+        OpenApiParameter(name='fin', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True),
+        OpenApiParameter(name='id_funcionario', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY, required=False, description="ID del funcionario (opcional, solo para supervisores)")
     ],
     responses=OpenApiTypes.OBJECT,
     tags=["Estadísticas"]
@@ -1188,7 +1205,7 @@ class TotalesGeneralesView(APIView):
     def get(self, request):
         fecha_inicio = request.GET.get("inicio")
         fecha_fin = request.GET.get("fin")
-        user = request.user
+        id_funcionario_param = request.GET.get("id_funcionario")
 
         #print(f" Usuario autenticado: {user.username}")
         #print(f" Rango de fechas recibido: {fecha_inicio} a {fecha_fin}")
@@ -1196,13 +1213,17 @@ class TotalesGeneralesView(APIView):
         try:
             inicio = make_aware(datetime.strptime(fecha_inicio, "%Y-%m-%d"))
             fin = make_aware(datetime.strptime(fecha_fin, "%Y-%m-%d")) + timedelta(days=1)
-        except Exception as e:
-            #print(f"❌ Error en fechas: {e}")
+        except Exception:
             return Response({"error": "Formato de fecha inválido."}, status=400)
 
-        funcionario = obtener_funcionario_para_estadisticas(request)
-        if funcionario == "NO_AUTORIZADO":
-            return Response({"error": "Usuario no autorizado"}, status=403)
+        es_supervisor = request.user.groups.filter(name="Supervisor").exists()
+
+        if id_funcionario_param and es_supervisor:
+            funcionario = id_funcionario_param
+        else:
+            funcionario = obtener_funcionario_para_estadisticas(request)
+            if funcionario == "NO_AUTORIZADO":
+                return Response({"error": "Usuario no autorizado"}, status=403)
 
         queryset = Atencion.objects.filter(
             fecha_atencion__range=(inicio, fin),
@@ -1213,22 +1234,16 @@ class TotalesGeneralesView(APIView):
                 output_field=DurationField()
             )
         )
+
         if funcionario:
             queryset = queryset.filter(id_funcionario=funcionario)
-
 
         total_turnos = queryset.count()
         promedio_tiempo = queryset.aggregate(prom=Avg("duracion"))["prom"]
         promedio_minutos = round(promedio_tiempo.total_seconds() / 60, 2) if promedio_tiempo else 0
 
-        # ✅ Contar los tipos de turno por nombre
         total_prioritarios = queryset.filter(id_turno__tipo_turno__nombre__iexact="Prioritario").count()
         total_generales = queryset.filter(id_turno__tipo_turno__nombre__iexact="General").count()
-
-        #print(f" Total turnos atendidos: {total_turnos}")
-        #print(f" Promedio de tiempo: {promedio_minutos} minutos")
-        #print(f" Total prioritarios: {total_prioritarios}")
-        #print(f" Total generales: {total_generales}")
 
         return Response({
             "total_turnos": total_turnos,
