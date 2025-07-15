@@ -42,6 +42,22 @@ def generar_nombre_turno(tipo_tramite_abrev, tipo_turno_abrev):
     secuencia = str(contador).zfill(3)
     return f"{tipo_tramite_abrev}{tipo_turno_abrev}{secuencia}"
 
+# FUNCION PARA RESOLVER EL FUNCIONARIO OBJETIVO
+def obtener_funcionario_para_estadisticas(request):
+    user = request.user
+
+    if user.groups.filter(name="Supervisor").exists():
+        return None  # para que no se filtre por funcionario
+
+    if user.groups.filter(name="Ventanillas").exists():
+        try:
+            return Funcionario.objects.get(user=user)
+        except Funcionario.DoesNotExist:
+            return "NO_AUTORIZADO"
+
+    return "NO_AUTORIZADO"
+
+
 # Create your views here.
 class FuncionarioViewSet(viewsets.ModelViewSet):
     queryset = Funcionario.objects.select_related('user')  # OPTIMIZACIÓN
@@ -945,35 +961,45 @@ class CancelarTurnoView(APIView):
 
 # ENDPOINT PARA LISTAR LOS USER QUE SON DE TIPO VENTANILLA CON LOS DATOS BASICOS DE LOS MISMOS
 @extend_schema(
-    summary="Listar funcionarios del grupo Ventanillas (o que pertenezcan también a otros)",
+    summary="Listar funcionarios del grupo Ventanillas si el usuario es Supervisor",
     responses={200: FuncionarioDetalleSerializer(many=True)},
     tags=["Funcionarios"]
 )
 class ListaFuncionariosVentanillaView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
-        try:
-            # Usuarios que estén en el grupo "Ventanillas"
-            usuarios_ventanilla_ids = User.objects.filter(groups__name='Ventanillas').values_list('id', flat=True)
-            
-            # Filtrar funcionarios relacionados con esos usuarios
-            funcionarios = Funcionario.objects.select_related('user').filter(user__id__in=usuarios_ventanilla_ids)
-            
+        user = request.user
+
+        if user.groups.filter(name="Supervisor").exists():
+            funcionarios = Funcionario.objects.select_related('user')\
+                .filter(user__groups__name='Ventanillas')\
+                .distinct()
             serializer = FuncionarioDetalleSerializer(funcionarios, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        
-        except Exception as e:
+
+        elif user.groups.filter(name="Ventanillas").exists():
             return Response(
-                {"error": f"Ocurrió un error al obtener los funcionarios: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"mensaje": "No autorizado para consultar la lista de funcionarios"},
+                status=status.HTTP_200_OK  # Deja 200 para que el frontend lo pueda manejar como respuesta válida
             )
 
+        return Response(
+            {"error": "Usuario no autorizado"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
 # ENDPOINTS PARA EL MODULO DE ESTADISTICAS
+
+
 # 1 TURNOS POR ESTADO EN UN RANGO DE FECHA PARA EL FUNCIONARIO
+
 @extend_schema(
     summary="Cantidad de turnos por estado atendidos por funcionario",
     parameters=[
         OpenApiParameter(name='inicio', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True),
-        OpenApiParameter(name='fin', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True)
+        OpenApiParameter(name='fin', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True),
+        OpenApiParameter(name='id_funcionario', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY, required=False, description="ID del funcionario (opcional, solo para supervisores)")
     ],
     responses=EstadisticaLabelValorSerializer(many=True),
     tags=["Estadísticas"]
@@ -984,48 +1010,36 @@ class TurnosPorEstadoView(APIView):
     def get(self, request):
         fecha_inicio = request.GET.get("inicio")
         fecha_fin = request.GET.get("fin")
-        user = request.user
+        id_funcionario_param = request.GET.get("id_funcionario")
 
         try:
             inicio = make_aware(datetime.strptime(fecha_inicio, "%Y-%m-%d"))
             fin = make_aware(datetime.strptime(fecha_fin, "%Y-%m-%d")) + timedelta(days=1)
-        except Exception as e:
-            #print(f"❌ Error en fecha: {e}")
+        except Exception:
             return Response({"error": "Formato de fecha inválido. Use YYYY-MM-DD"}, status=400)
 
-        try:
-            funcionario = Funcionario.objects.get(user=user)
-            #print(f"👤 Funcionario: {funcionario} (ID: {funcionario.id})")
-        except Funcionario.DoesNotExist:
-            #print("❌ No se encontró un funcionario vinculado al usuario")
-            return Response({'detail': 'El usuario no es un funcionario válido'}, status=403)
+        # Verificar si el usuario pertenece al grupo 'Supervisor'
+        es_supervisor = request.user.groups.filter(name="Supervisor").exists()
 
-        # Obtener atenciones según grupo
-        if user.groups.filter(name="Supervisor").exists():
-            #print("🧭 Usuario es SUPERVISOR: verá todas las atenciones en el rango")
-            atenciones = Atencion.objects.filter(fecha_atencion__range=(inicio, fin))
-        elif user.groups.filter(name="Ventanillas").exists():
-            #print("🧭 Usuario es FUNCIONARIO VENTANILLA: verá solo sus atenciones")
-            atenciones = Atencion.objects.filter(id_funcionario=funcionario, fecha_atencion__range=(inicio, fin))
+        if id_funcionario_param and es_supervisor:
+            funcionario = id_funcionario_param
         else:
-            #print("❌ Usuario no tiene permisos")
-            return Response({"error": "Usuario no autorizado"}, status=403)
+            funcionario = obtener_funcionario_para_estadisticas(request)
+            if funcionario == "NO_AUTORIZADO":
+                return Response({'detail': 'El usuario no es un funcionario válido'}, status=403)
 
-        total_atenciones = atenciones.count()
-        #print(f"📌 Total atenciones encontradas: {total_atenciones}")
+        atenciones = Atencion.objects.filter(fecha_atencion__range=(inicio, fin))
+        if funcionario:
+            atenciones = atenciones.filter(id_funcionario=funcionario)
 
-        if total_atenciones == 0:
-            #print("⚠️ No se encontraron atenciones en el rango indicado")
+        if not atenciones.exists():
             return Response([])
 
-        # Agrupar por estado de turno
         atenciones = atenciones.select_related("id_turno__estado")
         data = atenciones.values("id_turno__estado__nombre").annotate(total=Count("id"))
-        #print(f"📊 Conteo por estado: {list(data)}")
-
         resultado = [{"label": x["id_turno__estado__nombre"], "value": x["total"]} for x in data]
-
         return Response(resultado)
+
     
 # 2 ESTADISITICAS TURNOS POR HORA O POR DIA EN UN RANGO DE FECHA. VERIFICAR SI CUMPLE CON LA NECESIDAD, AMBIGUO
 @extend_schema(
@@ -1033,7 +1047,8 @@ class TurnosPorEstadoView(APIView):
     parameters=[
         OpenApiParameter(name='inicio', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True),
         OpenApiParameter(name='fin', type=OpenApiTypes.DATE, location=OpenApiParameter.QUERY, required=True),
-        OpenApiParameter(name='tipo', type=OpenApiTypes.STR, location=OpenApiParameter.QUERY, required=False, description="Agrupación: 'hora' o 'dia'")
+        OpenApiParameter(name='tipo', type=OpenApiTypes.STR, location=OpenApiParameter.QUERY, required=False, description="Agrupación: 'hora' o 'dia"),
+        OpenApiParameter(name='id_funcionario', type=OpenApiTypes.INT, location=OpenApiParameter.QUERY, required=False, description="ID del funcionario (opcional, solo para supervisores)")
     ],
     responses=EstadisticaLabelValorSerializer(many=True),
     tags=["Estadísticas"]
@@ -1045,7 +1060,7 @@ class TurnosPorHoraDiaView(APIView):
         fecha_inicio = request.GET.get("inicio")
         fecha_fin = request.GET.get("fin")
         agrupacion = request.GET.get("tipo", "dia")
-        user = request.user
+        id_funcionario_param = request.GET.get("id_funcionario")
 
         try:
             inicio = make_aware(datetime.strptime(fecha_inicio, "%Y-%m-%d"))
@@ -1053,13 +1068,18 @@ class TurnosPorHoraDiaView(APIView):
         except:
             return Response({"error": "Formato de fecha inválido."}, status=400)
 
-        queryset = Turno.objects.filter(fecha_turno__range=(inicio, fin))
+        es_supervisor = request.user.groups.filter(name="Supervisor").exists()
 
-        if user.groups.filter(name="Ventanillas").exists():
-            funcionario = Funcionario.objects.get(user=user)
+        if id_funcionario_param and es_supervisor:
+            funcionario = id_funcionario_param
+        else:
+            funcionario = obtener_funcionario_para_estadisticas(request)
+            if funcionario == "NO_AUTORIZADO":
+                return Response({"error": "Usuario no autorizado"}, status=403)
+
+        queryset = Turno.objects.filter(fecha_turno__range=(inicio, fin))
+        if funcionario:
             queryset = queryset.filter(atencion__id_funcionario=funcionario)
-        elif not user.groups.filter(name="Supervisor").exists():
-            return Response({"error": "Usuario no autorizado"}, status=403)
 
         if agrupacion == "hora":
             from django.db.models.functions import ExtractHour
@@ -1096,13 +1116,13 @@ class TurnosPorTramiteView(APIView):
         except:
             return Response({"error": "Formato de fecha inválido."}, status=400)
 
-        queryset = Turno.objects.filter(fecha_turno__range=(inicio, fin))
-
-        if user.groups.filter(name="Ventanillas").exists():
-            funcionario = Funcionario.objects.get(user=user)
-            queryset = queryset.filter(atencion__id_funcionario=funcionario)
-        elif not user.groups.filter(name="Supervisor").exists():
+        funcionario = obtener_funcionario_para_estadisticas(request)
+        if funcionario == "NO_AUTORIZADO":
             return Response({"error": "Usuario no autorizado"}, status=403)
+
+        queryset = Turno.objects.filter(fecha_turno__range=(inicio, fin))
+        if funcionario:
+            queryset = queryset.filter(atencion__id_funcionario=funcionario)
 
         data = queryset.values("tipo_tramite__nombre").annotate(total=Count("id"))
         resultado = [{"label": x["tipo_tramite__nombre"], "value": x["total"]} for x in data]
@@ -1132,18 +1152,18 @@ class PromedioAtencionPorTramiteView(APIView):
         except:
             return Response({"error": "Formato de fecha inválido."}, status=400)
 
+        funcionario = obtener_funcionario_para_estadisticas(request)
+        if funcionario == "NO_AUTORIZADO":
+            return Response({"error": "Usuario no autorizado"}, status=403)
+
         queryset = Atencion.objects.filter(
             fecha_atencion__range=(inicio, fin),
             fecha_fin_atencion__isnull=False
         ).annotate(
             duracion=ExpressionWrapper(F('fecha_fin_atencion') - F('fecha_atencion'), output_field=DurationField())
         )
-
-        if user.groups.filter(name="Ventanillas").exists():
-            funcionario = Funcionario.objects.get(user=user)
+        if funcionario:
             queryset = queryset.filter(id_funcionario=funcionario)
-        elif not user.groups.filter(name="Supervisor").exists():
-            return Response({"error": "Usuario no autorizado"}, status=403)
 
         data = queryset.values("id_turno__tipo_tramite__nombre").annotate(promedio=Avg("duracion"))
         resultado = [
@@ -1180,6 +1200,10 @@ class TotalesGeneralesView(APIView):
             #print(f"❌ Error en fechas: {e}")
             return Response({"error": "Formato de fecha inválido."}, status=400)
 
+        funcionario = obtener_funcionario_para_estadisticas(request)
+        if funcionario == "NO_AUTORIZADO":
+            return Response({"error": "Usuario no autorizado"}, status=403)
+
         queryset = Atencion.objects.filter(
             fecha_atencion__range=(inicio, fin),
             fecha_fin_atencion__isnull=False
@@ -1189,13 +1213,9 @@ class TotalesGeneralesView(APIView):
                 output_field=DurationField()
             )
         )
-
-        if user.groups.filter(name="Ventanillas").exists():
-            funcionario = Funcionario.objects.get(user=user)
+        if funcionario:
             queryset = queryset.filter(id_funcionario=funcionario)
-            #print(f" Funcionario filtrado: {funcionario}")
-        elif not user.groups.filter(name="Supervisor").exists():
-            return Response({"error": "Usuario no autorizado"}, status=403)
+
 
         total_turnos = queryset.count()
         promedio_tiempo = queryset.aggregate(prom=Avg("duracion"))["prom"]
