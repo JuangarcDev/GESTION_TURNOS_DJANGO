@@ -160,14 +160,23 @@ class PuestoSerializer(serializers.ModelSerializer):
 class UsuarioAutenticadoSerializer(serializers.ModelSerializer):
     func_ventanilla = serializers.SerializerMethodField()
     id_funcionario = serializers.CharField(source="funcionario.id", read_only=True)
+    groups = serializers.SlugRelatedField(
+        many=True,
+        read_only=True,
+        slug_field='name'
+    )
+
     class Meta:
         model = User
-        fields = ["id", 
-                  "username", 
-                  "first_name", 
-                  "last_name", 
-                  "func_ventanilla",
-                  "id_funcionario"]
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "func_ventanilla",
+            "id_funcionario",
+            "groups"
+        ]
 
     @extend_schema_field(serializers.CharField())
     def get_func_ventanilla(self, obj):
