@@ -688,10 +688,15 @@ def gestionar_turno(request):
     if existe_ventanilla_productos:
         # Si existen ventanillas de productos, filtrar turnos por letra según tipo de ventanilla
         if es_ventanilla_productos:
-            turnos_disponibles = turnos_disponibles.filter(turno__istartswith='E')
+            # Ventanilla productos: acepta turnos que empiezan con E o P
+            turnos_disponibles = turnos_disponibles.filter(
+                Q(turno__istartswith='E') | Q(turno__istartswith='P')
+            )
         else:
-            turnos_disponibles = turnos_disponibles.exclude(turno__istartswith='E')
-
+            # Otras ventanillas: excluyen turnos que empiezan con E o P (productos)
+            turnos_disponibles = turnos_disponibles.exclude(
+                Q(turno__istartswith='E') | Q(turno__istartswith='P')
+            )
 # Si no hay turnos aplicables, retornar error
     if not turnos_disponibles.exists():
         #print("❌ No hay turnos disponibles en espera (tras filtrar por ventanilla).")

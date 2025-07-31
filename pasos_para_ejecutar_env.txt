@@ -8,7 +8,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 #MIGRACIONES Y CREACION DE SUPER USER DE SER NECESARIO
-
+python manage.py makemigrations
 python manage.py migrate
 python manage.py createsuperuser
 
@@ -22,3 +22,5 @@ http://127.0.0.1:8000/api/schema/swagger-ui/#/
 http://127.0.0.1:8000/admin/login/?next=/admin/
 # VISTA DRF
 http://127.0.0.1:8000/api/
+
+https://gitlab.com/acc17/turnero
