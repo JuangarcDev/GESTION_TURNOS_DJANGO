@@ -5,9 +5,9 @@ class TurnosApiConfig(AppConfig):
     name = 'turnos_api'
 
     def ready(self):
-        print("⏳ Ejecutando método ready() en TurnosApiConfig...")
+        print("Ejecutando método ready() en TurnosApiConfig...")
         try:
             import turnos_api.signals
-            print("✅ Módulo de señales importado correctamente desde APPS.")
+            print("Módulo de señales importado correctamente desde APPS.")
         except Exception as e:
-            print(f"❌ Error al importar señales: {e}")
+            print(f"Error al importar señales: {e}")

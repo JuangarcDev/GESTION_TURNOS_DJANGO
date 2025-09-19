@@ -236,4 +236,5 @@ class EstadisticasFuncionarioSerializer(serializers.Serializer):
 class EstadisticaLabelValorSerializer(serializers.Serializer):
     label = serializers.CharField(help_text="Nombre o categoría (ej. estado, trámite, fecha, etc.)")
     value = serializers.FloatField(help_text="Valor numérico correspondiente")
-    
+
+# COMENTARIOS PARA ACTUALIZAR EL SERIALIZADOR       

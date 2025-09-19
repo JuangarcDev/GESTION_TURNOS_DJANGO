@@ -39,7 +39,7 @@ def poblar_tablas_dominio(sender, **kwargs):
         return
 
     with transaction.atomic():
-        print("🔄 Poblando tablas de dominio de forma segura...")
+        print("Poblando tablas de dominio de forma segura...")
 
         # Renombrar secuencia antigua si quedó con el nombre anterior al rename del modelo
         renombrar_secuencia_antigua_si_existe()
@@ -54,7 +54,7 @@ def poblar_tablas_dominio(sender, **kwargs):
         # Crear grupo Ventanillas si no existe
         grupo_ventanilla, creado = Group.objects.get_or_create(name="Ventanillas")
         if creado:
-            print("✅ Grupo 'Ventanillas' creado automáticamente.")
+            print("Grupo 'Ventanillas' creado automáticamente.")
         else:
             print("ℹ️ Grupo 'Ventanillas' ya existía.")
 
@@ -114,22 +114,22 @@ def poblar_tablas_dominio(sender, **kwargs):
         reset_sequence(EstadoVentanilla)
         reset_sequence(Ventanilla)
 
-        print("✅ Tablas de dominio y secuencias configuradas correctamente.")
+        print("Tablas de dominio y secuencias configuradas correctamente.")
 
         
 @receiver(post_save, sender=User)
 def crear_funcionario_automaticamente(sender, instance, created, **kwargs):
-    print(f"🧪 Señal activada - Usuario: {instance.username}, created: {created}")
+    print(f"Señal activada - Usuario: {instance.username}, created: {created}")
     if created:
         try:
             grupo_ventanilla = Group.objects.get(name='Ventanillas')
-            print(f"➡️ ¿Usuario en grupo Ventanillas?: {grupo_ventanilla in instance.groups.all()}")
+            print(f"¿Usuario en grupo Ventanillas?: {grupo_ventanilla in instance.groups.all()}")
             if grupo_ventanilla in instance.groups.all():
                 if not Funcionario.objects.filter(user=instance).exists():
                     Funcionario.objects.create(user=instance)
-                    print("✅ Funcionario creado.")
+                    print("Funcionario creado.")
         except Group.DoesNotExist:
-            print("❌ Grupo 'Ventanillas' no existe")
+            print("Grupo 'Ventanillas' no existe")
 
 @receiver(m2m_changed, sender=User.groups.through)
 def crear_funcionario_si_ventanilla(sender, instance, action, pk_set, **kwargs):
@@ -138,6 +138,7 @@ def crear_funcionario_si_ventanilla(sender, instance, action, pk_set, **kwargs):
         if grupo_ventanilla and grupo_ventanilla.pk in pk_set:
             if not Funcionario.objects.filter(user=instance).exists():
                 Funcionario.objects.create(user=instance)
-                print(f"✅ Funcionario creado automáticamente para el usuario: {instance.username}")
+                print(f"Funcionario creado automáticamente para el usuario: {instance.username}")
             else:
                 print(f"ℹ️ El usuario {instance.username} ya tiene un Funcionario asignado.")
+                

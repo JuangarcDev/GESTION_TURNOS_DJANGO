@@ -205,7 +205,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
         fecha_inicio_str = request.GET.get('fecha_inicio')
         fecha_fin_str = request.GET.get('fecha_fin')
 
-        # 🔐 Validación y extracción del token
+        # Validación y extracción del token
         token_header = request.headers.get('Authorization')
         if not token_header:
             return Response({"error": "Token requerido en el header Authorization"}, status=400)
@@ -216,14 +216,14 @@ class TurnoViewSet(viewsets.ModelViewSet):
         except Exception:
             return Response({"error": "Token inválido o expirado"}, status=401)
 
-        # 🚪 Obtener el puesto asociado al token
+        # Obtener el puesto asociado al token
         puesto = Puesto.objects.select_related('id_ventanilla').filter(token=token, fecha_salida__isnull=True).first()
         if not puesto:
             return Response({"error": "No se encontró puesto activo asociado al token"}, status=401)
         
         ventanilla_id = puesto.id_ventanilla.id
 
-        # 🧠 Manejo de fechas con timezone
+        # Manejo de fechas con timezone
         tz = pytz.timezone('America/Bogota')
         try:
             fecha_inicio_dt = make_aware(datetime.combine(
@@ -236,7 +236,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
         except ValueError:
             return Response({"error": "Formato de fecha inválido. Use YYYY-MM-DD."}, status=400)
 
-        # 🔍 Filtro compuesto usando Q
+        # Filtro compuesto usando Q
         filtros = Q(fecha_turno__range=(fecha_inicio_dt, fecha_fin_dt))
         
         if estado_id:
@@ -254,7 +254,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
             else:
                 filtros &= Q(atencion__id_ventanilla=ventanilla_id)
 
-        # 📦 Consulta optimizada con relaciones cargadas
+        # Consulta optimizada con relaciones cargadas
         turnos = Turno.objects.select_related(
             'id_usuario', 'estado', 'tipo_turno', 'tipo_tramite'
         ).prefetch_related(
@@ -265,7 +265,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
         serializer = TurnoSerializer(turnos, many=True)
         return Response(serializer.data)
 
-    #ACA CREAREMOS EL ENDPOINT PARA BUSCAR POR EL NOMBRE Y OPCIONALMENTE UNA FECHA
+    # ACA CREAREMOS EL ENDPOINT PARA BUSCAR POR EL NOMBRE Y OPCIONALMENTE UNA FECHA
     @extend_schema(
         parameters=[
             OpenApiParameter(name='turno', required=False, type=str, location=OpenApiParameter.QUERY, description='Nombre (o parte del nombre) del turno'),
@@ -627,7 +627,6 @@ class AsignarVentanillaView(APIView):
 def gestionar_turno(request):
     token_header = request.headers.get('Authorization', '')
     token = token_header.split(' ')[1] if token_header.startswith('Bearer ') else None
-    #print(f"\n🔑 TOKEN RECIBIDO: {token}")
     
     if not token:
         return Response({"error": "Token requerido."}, status=400)
@@ -643,12 +642,10 @@ def gestionar_turno(request):
     ).first()
     
     if not puesto:
-        #print("❌ No se encontró puesto activo.")
         return Response({"error": "Token inválido o sesión terminada."}, status=401)
 
     funcionario = puesto.id_funcionario
     ventanilla = puesto.id_ventanilla
-    #print(f"✅ FUNCIONARIO: {funcionario}, VENTANILLA: {ventanilla}")
 
     # --- FINALIZAR TURNO EN ATENCION ---
     atencion_activa = Atencion.objects.select_related("id_turno").filter(
@@ -659,7 +656,6 @@ def gestionar_turno(request):
 
     if atencion_activa:
         turno_activo = atencion_activa.id_turno
-        #print(f"✔️ Finalizando turno en atención: {turno_activo.turno}")
         estado_finalizado = EstadoTurno.objects.get(nombre="Finalizado")
         turno_activo.estado = estado_finalizado
         turno_activo.save()
@@ -675,10 +671,6 @@ def gestionar_turno(request):
     existe_ventanilla_productos = Ventanilla.objects.filter(nombre__icontains='prod').exists()
     # ¿Es ventanilla de productos?
     es_ventanilla_productos = 'prod' in ventanilla.nombre.lower()
-
-    #print(f"🧭 Existen ventanillas de productos: {existe_ventanilla_productos}")
-    #print(f"🔎 Ventanilla actual '{ventanilla.nombre}' es de productos: {es_ventanilla_productos}")
-
     # Filtrar turnos disponibles
     turnos_disponibles = Turno.objects.select_related("tipo_tramite", "estado").filter(
         estado__nombre="Espera"
@@ -693,13 +685,13 @@ def gestionar_turno(request):
                 Q(turno__istartswith='E') | Q(turno__istartswith='P')
             )
         else:
-            # Otras ventanillas: excluyen turnos que empiezan con E o P (productos)
+            # Otras ventanillas: excluyen turnos que empiezan con E o P (productos) funcionando
             turnos_disponibles = turnos_disponibles.exclude(
                 Q(turno__istartswith='E') | Q(turno__istartswith='P')
             )
+
 # Si no hay turnos aplicables, retornar error
     if not turnos_disponibles.exists():
-        #print("❌ No hay turnos disponibles en espera (tras filtrar por ventanilla).")
         return Response({"error": "No hay turnos disponibles para atender."}, status=400)
 
     # Ordenar por urgencia
@@ -725,22 +717,12 @@ def gestionar_turno(request):
 
         porcentaje = transcurrido / tiempo_estimado if tiempo_estimado != 0 else 1
 
-        #print(
-        #    f"📌 Turno {turno.turno} | Tipo turno: {turno.tipo_turno.nombre} | "
-        #    f"Trámite: {turno.tipo_tramite.nombre} | "
-        #    f"Fecha turno: {turno.fecha_turno.strftime('%H:%M:%S')} | "
-        #    f"Transcurrido: {transcurrido:.2f} min | "
-        #    f"Estimado: {tiempo_estimado} min | "
-        #    f"Prioridad (%): {porcentaje:.2f}"
-        #)
-
         return porcentaje
 
     # Ordenar los turnos
     turnos_ordenados = sorted(turnos_disponibles, key=calcular_porcentaje, reverse=True)
     
     turno_prioritario = turnos_ordenados[0]
-    #print(f"🎯 Turno seleccionado para atención: {turno_prioritario.turno}")
 
     # Cambiar estado a "Atención"
     estado_atencion = EstadoTurno.objects.get(nombre="Atención")
@@ -807,7 +789,7 @@ class LogoutView(APIView):
             funcionario = puesto.id_funcionario
             ventanilla = puesto.id_ventanilla
 
-            print(f"🔍 Verificando atenciones activas para funcionario: {funcionario} y ventanilla: {ventanilla}")
+            print(f" Verificando atenciones activas para funcionario: {funcionario} y ventanilla: {ventanilla}")
 
             # Paso 4: Finalizar turnos en atención activos antes de cerrar sesión
             atenciones_activas = Atencion.objects.select_related("id_turno").filter(
@@ -826,7 +808,7 @@ class LogoutView(APIView):
                 turno.estado = estado_finalizado
                 turno.save()
 
-                print(f"✅ Turno {turno.turno} finalizado automáticamente en logout.")
+                print(f"Turno {turno.turno} finalizado automáticamente en logout.")
 
             # Paso 5: Cerrar puesto (liberar ventanilla)
             puesto.fecha_salida = timezone.now()
