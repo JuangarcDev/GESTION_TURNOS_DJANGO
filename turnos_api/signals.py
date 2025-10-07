@@ -113,20 +113,20 @@ def poblar_tablas_dominio(sender, **kwargs):
         reset_sequence(EstadoVentanilla)
         reset_sequence(Ventanilla)
 
-        print("Tablas de dominio y secuencias configuradas correctamente.")
+        # print("Tablas de dominio y secuencias configuradas correctamente.")
 
         
 @receiver(post_save, sender=User)
 def crear_funcionario_automaticamente(sender, instance, created, **kwargs):
-    print(f"signal activada - Usuario: {instance.username}, created: {created}")
+    # print(f"signal activada - Usuario: {instance.username}, created: {created}")
     if created:
         try:
             grupo_ventanilla = Group.objects.get(name='Ventanillas')
-            print(f"¿Usuario en grupo Ventanillas?: {grupo_ventanilla in instance.groups.all()}")
+            # print(f"¿Usuario en grupo Ventanillas?: {grupo_ventanilla in instance.groups.all()}")
             if grupo_ventanilla in instance.groups.all():
                 if not Funcionario.objects.filter(user=instance).exists():
                     Funcionario.objects.create(user=instance)
-                    print("Funcionario creado.")
+                    # print("Funcionario creado.")
         except Group.DoesNotExist:
             print("Grupo 'Ventanillas' no existe")
 
@@ -137,7 +137,7 @@ def crear_funcionario_si_ventanilla(sender, instance, action, pk_set, **kwargs):
         if grupo_ventanilla and grupo_ventanilla.pk in pk_set:
             if not Funcionario.objects.filter(user=instance).exists():
                 Funcionario.objects.create(user=instance)
-                print(f"Funcionario creado automáticamente para el usuario: {instance.username}")
+                # print(f"Funcionario creado automáticamente para el usuario: {instance.username}")
             else:
                 print(f"El usuario {instance.username} ya tiene un Funcionario asignado.")
                 
