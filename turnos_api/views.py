@@ -14,7 +14,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes,
 from django.utils.timezone import now, localtime, make_aware, timedelta
 from datetime import datetime, time
 import pytz
-from django.db.models import Count, Avg, F, ExpressionWrapper, DurationField, Q
+from django.db.models import Count, Avg, F, ExpressionWrapper, DurationField, Q, Sum
 from datetime import datetime, timedelta
 from rest_framework.generics import ListAPIView
 from rest_framework.exceptions import ValidationError, NotFound, APIException, AuthenticationFailed
@@ -824,7 +824,6 @@ class LogoutView(APIView):
 
         return Response({"message": "Sesión cerrada correctamente."})
     
-# ENDPOINT CON ESTADISTICAS USUARIO VENTANILLA: CANTIDAD DIA, HISTORICO TURNOS ATENDIDOS. TIEMPO PROMEDIO ATENCION POR TURNO, DIA HISTORICO.
 @extend_schema(
     responses=EstadisticasFuncionarioSerializer,
     tags=["Estadísticas"]
@@ -833,7 +832,6 @@ class EstadisticasFuncionarioView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Verificar si es funcionario
         try:
             funcionario = Funcionario.objects.get(user=request.user)
         except Funcionario.DoesNotExist:
@@ -841,52 +839,66 @@ class EstadisticasFuncionarioView(APIView):
 
         hoy = localtime(now()).date()
 
-        # Atenciones del día de hoy para este funcionario
-        atenciones_hoy = Atencion.objects.filter(
+        # =============================
+        # ATENCIONES DEL DIA DE HOY
+
+        # Conteo total de atenciones del día (sin filtrar)
+        atenciones_hoy_total = Atencion.objects.filter(
             id_funcionario=funcionario,
             fecha_atencion__date=hoy,
             fecha_fin_atencion__isnull=False
-        ).annotate(
+        )
+
+        total_tramites_hoy = atenciones_hoy_total.count()
+
+        # Para el promedio, solo consideramos atenciones razonables (≤ 2h)
+        atenciones_hoy_validas = atenciones_hoy_total.annotate(
             duracion=ExpressionWrapper(
                 F('fecha_fin_atencion') - F('fecha_atencion'),
                 output_field=DurationField()
             )
-        )
+        ).filter(duracion__lte=timedelta(hours=2))
 
-        # Conteo de trámites atendidos hoy
-        total_tramites_hoy = atenciones_hoy.count()
+        total_duracion_hoy = atenciones_hoy_validas.aggregate(total=Sum('duracion'))['total']
+        if total_duracion_hoy and atenciones_hoy_validas.exists():
+            tiempo_promedio_hoy_min = round(
+                (total_duracion_hoy.total_seconds() / 60) / atenciones_hoy_validas.count(), 2
+            )
+        else:
+            tiempo_promedio_hoy_min = 0
 
-        # Tiempo promedio de atención hoy (en minutos)
-        tiempo_promedio_hoy = atenciones_hoy.aggregate(
-            promedio=Avg('duracion')
-        )['promedio']
-        tiempo_promedio_hoy_min = round(tiempo_promedio_hoy.total_seconds() / 60, 2) if tiempo_promedio_hoy else 0
-
-        # Atenciones pasadas (anteriores a hoy)
-        atenciones_pasadas = Atencion.objects.filter(
+        # =====================================
+        # ATENCIONES HISTORICAS (anteriores)
+        atenciones_pasadas_total = Atencion.objects.filter(
             id_funcionario=funcionario,
             fecha_atencion__date__lt=hoy,
             fecha_fin_atencion__isnull=False
-        ).annotate(
-            dia=TruncDate('fecha_atencion'),
-            duracion=ExpressionWrapper(
-                F('fecha_fin_atencion') - F('fecha_atencion'),
-                output_field=DurationField()
-            )
         )
 
-        # Promedio de trámites por día (anteriores)
-        tramites_por_dia = atenciones_pasadas.values('dia').annotate(total=Count('id'))
+        # Conteo de trámites históricos agrupados por día
+        tramites_por_dia = atenciones_pasadas_total.values('fecha_atencion__date').annotate(total=Count('id'))
         total_dias = tramites_por_dia.count()
         total_tramites_anteriores = sum(item['total'] for item in tramites_por_dia)
         promedio_tramites_por_dia = round(total_tramites_anteriores / total_dias, 2) if total_dias else 0
 
-        # Tiempo promedio de atención por día en días anteriores
-        tiempo_promedio_anteriores = atenciones_pasadas.aggregate(
-            promedio=Avg('duracion')
-        )['promedio']
-        tiempo_promedio_anteriores_min = round(tiempo_promedio_anteriores.total_seconds() / 60, 2) if tiempo_promedio_anteriores else 0
+        # Promedio histórico (solo atenciones válidas)
+        atenciones_pasadas_validas = atenciones_pasadas_total.annotate(
+            duracion=ExpressionWrapper(
+                F('fecha_fin_atencion') - F('fecha_atencion'),
+                output_field=DurationField()
+            )
+        ).filter(duracion__lte=timedelta(hours=2))
 
+        total_duracion_anteriores = atenciones_pasadas_validas.aggregate(total=Sum('duracion'))['total']
+        if total_duracion_anteriores and atenciones_pasadas_validas.exists():
+            tiempo_promedio_anteriores_min = round(
+                (total_duracion_anteriores.total_seconds() / 60) / atenciones_pasadas_validas.count(), 2
+            )
+        else:
+            tiempo_promedio_anteriores_min = 0
+
+        # =========================
+        #  RESPUESTA FINAL JSON
         return Response({
             'Conteo_Tramites_Hoy': total_tramites_hoy,
             'Promedio_Tramites_Dia_Historico': promedio_tramites_por_dia,
