@@ -1082,11 +1082,23 @@ class TurnosPorHoraDiaView(APIView):
 
         if agrupacion == "hora":
             from django.db.models.functions import ExtractHour
-            data = queryset.annotate(hora=ExtractHour("fecha_turno")).values("hora").annotate(total=Count("id"))
+            data = (
+                queryset
+                .annotate(hora=ExtractHour("fecha_turno"))
+                .values("hora")
+                .annotate(total=Count("id"))
+                .order_by("hora")
+            )
             resultado = [{"label": f"{x['hora']}:00", "value": x["total"]} for x in data]
         else:
             from django.db.models.functions import TruncDate
-            data = queryset.annotate(dia=TruncDate("fecha_turno")).values("dia").annotate(total=Count("id"))
+            data = (
+                queryset
+                .annotate(dia=TruncDate("fecha_turno"))
+                .values("dia")
+                .annotate(total=Count("id"))
+                .order_by("dia")
+            )
             resultado = [{"label": x["dia"].strftime("%Y-%m-%d"), "value": x["total"]} for x in data]
 
         return Response(resultado)
