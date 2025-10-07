@@ -662,7 +662,7 @@ def gestionar_turno(request):
         atencion_activa.fecha_fin_atencion = timezone.now()
         atencion_activa.save()
     else:
-        print("ℹ️ No había turno en atención para finalizar.")
+        print("No existen turnos en atencion por finalizar.")
 
     # --- BUSCAR TURNO MAS PRIORITARIO ---
     ahora = timezone.now()
@@ -789,8 +789,6 @@ class LogoutView(APIView):
             funcionario = puesto.id_funcionario
             ventanilla = puesto.id_ventanilla
 
-            print(f" Verificando atenciones activas para funcionario: {funcionario} y ventanilla: {ventanilla}")
-
             # Paso 4: Finalizar turnos en atención activos antes de cerrar sesión
             atenciones_activas = Atencion.objects.select_related("id_turno").filter(
                 id_funcionario=funcionario,
@@ -807,8 +805,6 @@ class LogoutView(APIView):
                 turno = atencion.id_turno
                 turno.estado = estado_finalizado
                 turno.save()
-
-                print(f"Turno {turno.turno} finalizado automáticamente en logout.")
 
             # Paso 5: Cerrar puesto (liberar ventanilla)
             puesto.fecha_salida = timezone.now()
@@ -990,9 +986,7 @@ class ListaFuncionariosVentanillaView(APIView):
 
 # ENDPOINTS PARA EL MODULO DE ESTADISTICAS
 
-
-# 1 TURNOS POR ESTADO EN UN RANGO DE FECHA PARA EL FUNCIONARIO
-
+# 1 TURNOS POR ESTADO EN UN RANGO DE FECHA PARA EL FUNCIONARIO. GRAFICA DE TORTA
 @extend_schema(
     summary="Cantidad de turnos por estado atendidos por funcionario",
     parameters=[
@@ -1040,7 +1034,7 @@ class TurnosPorEstadoView(APIView):
         return Response(resultado)
 
     
-# 2 ESTADISITICAS TURNOS POR HORA O POR DIA EN UN RANGO DE FECHA. VERIFICAR SI CUMPLE CON LA NECESIDAD, AMBIGUO
+# 2 ESTADISTICAS TURNOS POR HORA O POR DIA EN UN RANGO DE FECHA. GRAFICA DE PUNTOS - LINEA
 @extend_schema(
     summary="Cantidad de turnos por hora o día",
     parameters=[
@@ -1103,7 +1097,7 @@ class TurnosPorHoraDiaView(APIView):
 
         return Response(resultado)
     
-# 3 TURNOS POR TIPO DE TRAMITE (BARRAS)
+# 3 TURNOS POR TIPO DE TRAMITE GRAFICA DE TORTA CON ETIQUETAS
 @extend_schema(
     summary="Cantidad de turnos por tipo de trámite",
     parameters=[
@@ -1145,7 +1139,7 @@ class TurnosPorTramiteView(APIView):
         resultado = [{"label": x["tipo_tramite__nombre"], "value": x["total"]} for x in data]
         return Response(resultado)
     
-#4 TIEMPO PROMEDIO DE ATENCION POR TRAMITE
+#4 TIEMPO PROMEDIO DE ATENCION POR TRAMITE GRAFICA DE BARRAS LATERALES
 @extend_schema(
     summary="Tiempo promedio de atención por tipo de trámite",
     parameters=[
@@ -1218,9 +1212,6 @@ class TotalesGeneralesView(APIView):
         fecha_fin = request.GET.get("fin")
         id_funcionario_param = request.GET.get("id_funcionario")
 
-        #print(f" Usuario autenticado: {user.username}")
-        #print(f" Rango de fechas recibido: {fecha_inicio} a {fecha_fin}")
-
         try:
             inicio = make_aware(datetime.strptime(fecha_inicio, "%Y-%m-%d"))
             fin = make_aware(datetime.strptime(fecha_fin, "%Y-%m-%d")) + timedelta(days=1)
@@ -1235,7 +1226,8 @@ class TotalesGeneralesView(APIView):
             funcionario = obtener_funcionario_para_estadisticas(request)
             if funcionario == "NO_AUTORIZADO":
                 return Response({"error": "Usuario no autorizado"}, status=403)
-
+        
+        # QUERY BASE, TODAS LAS ATENCIONES COMPLETAS
         queryset = Atencion.objects.filter(
             fecha_atencion__range=(inicio, fin),
             fecha_fin_atencion__isnull=False
@@ -1249,16 +1241,26 @@ class TotalesGeneralesView(APIView):
         if funcionario:
             queryset = queryset.filter(id_funcionario=funcionario)
 
+        # CONTADORES DE TURNOS (todos, sin excluir atípicos)
         total_turnos = queryset.count()
-        promedio_tiempo = queryset.aggregate(prom=Avg("duracion"))["prom"]
-        promedio_minutos = round(promedio_tiempo.total_seconds() / 60, 2) if promedio_tiempo else 0
-
         total_prioritarios = queryset.filter(id_turno__tipo_turno__nombre__iexact="Prioritario").count()
         total_generales = queryset.filter(id_turno__tipo_turno__nombre__iexact="General").count()
 
+        # PROMEDIO DE TIEMPO (SE DEJAN POR FUERA ATIPICOS DURACION 2H O MAYOR)
+        queryset_validos = queryset.filter(duracion__lte=timedelta(hours=2))
+
+        total_duracion_validos = queryset_validos.aggregate(total=Sum('duracion'))['total']
+        if total_duracion_validos and queryset_validos.exists():
+            promedio_tiempo_min = round(
+                (total_duracion_validos.total_seconds() / 60) / queryset_validos.count(), 2
+            )
+        else:
+            promedio_tiempo_min = 0
+
+        # RESPUESTA
         return Response({
             "total_turnos": total_turnos,
-            "promedio_tiempo_min": promedio_minutos,
+            "promedio_tiempo_min": promedio_tiempo_min,
             "total_prioritarios": total_prioritarios,
             "total_generales": total_generales
         })

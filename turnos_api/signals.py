@@ -39,7 +39,6 @@ def poblar_tablas_dominio(sender, **kwargs):
         return
 
     with transaction.atomic():
-        print("Poblando tablas de dominio de forma segura...")
 
         # Renombrar secuencia antigua si quedó con el nombre anterior al rename del modelo
         renombrar_secuencia_antigua_si_existe()
@@ -54,9 +53,9 @@ def poblar_tablas_dominio(sender, **kwargs):
         # Crear grupo Ventanillas si no existe
         grupo_ventanilla, creado = Group.objects.get_or_create(name="Ventanillas")
         if creado:
-            print("Grupo 'Ventanillas' creado automáticamente.")
+            print("Grupo 'Ventanillas' creado.")
         else:
-            print("ℹ️ Grupo 'Ventanillas' ya existía.")
+            print("Grupo 'Ventanillas' ya existía.")
 
         # Poblado con IDs fijos
         tipos_turno = [
@@ -119,7 +118,7 @@ def poblar_tablas_dominio(sender, **kwargs):
         
 @receiver(post_save, sender=User)
 def crear_funcionario_automaticamente(sender, instance, created, **kwargs):
-    print(f"Señal activada - Usuario: {instance.username}, created: {created}")
+    print(f"signal activada - Usuario: {instance.username}, created: {created}")
     if created:
         try:
             grupo_ventanilla = Group.objects.get(name='Ventanillas')
@@ -140,5 +139,5 @@ def crear_funcionario_si_ventanilla(sender, instance, action, pk_set, **kwargs):
                 Funcionario.objects.create(user=instance)
                 print(f"Funcionario creado automáticamente para el usuario: {instance.username}")
             else:
-                print(f"ℹ️ El usuario {instance.username} ya tiene un Funcionario asignado.")
+                print(f"El usuario {instance.username} ya tiene un Funcionario asignado.")
                 
