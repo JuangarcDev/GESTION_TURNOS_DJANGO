@@ -47,7 +47,7 @@ def obtener_funcionario_para_estadisticas(request):
     user = request.user
 
     if user.groups.filter(name="Supervisor").exists():
-        return None  # para que no se filtre por funcionario
+        return None
 
     if user.groups.filter(name="Ventanillas").exists():
         try:
@@ -60,13 +60,13 @@ def obtener_funcionario_para_estadisticas(request):
 
 # Create your views here.
 class FuncionarioViewSet(viewsets.ModelViewSet):
-    queryset = Funcionario.objects.select_related('user')  # OPTIMIZACIÓN
+    queryset = Funcionario.objects.select_related('user')
     serializer_class = FuncionarioSerializer
     permission_classes = [IsAuthenticated]
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = list(self.get_queryset())  # Evalúa una sola vez
+            queryset = list(self.get_queryset())
             if not queryset:
                 raise CustomAPIException("No se encontraron registros en la base de datos", 404)
             serializer = self.get_serializer(queryset, many=True)
@@ -84,7 +84,7 @@ class FuncionarioViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class VentanillaViewSet(viewsets.ModelViewSet):
-    queryset = Ventanilla.objects.select_related('estado')  # OPTIMIZACIÓN
+    queryset = Ventanilla.objects.select_related('estado')
     serializer_class = VentanillaSerializer
     permission_classes = [IsAuthenticated]
 
@@ -115,7 +115,7 @@ class TurnoViewSet(viewsets.ModelViewSet):
     # Permitimos que el metodo POST sea público o no requiera de Autenticación
     def get_permissions(self):
         if self.action == 'create':
-            return [] # Permitir que sea público el método POST
+            return []
         return super().get_permissions()
 
     # Sobreescribimos metodo create, para completar automaticámente el valor de los 3 atributos(fecha_turno, estado y turno) cuando se cree un nuevo registro de turno
@@ -357,9 +357,9 @@ class UsuarioViewSet(viewsets.ModelViewSet):
     serializer_class = UsuarioSerializer
 
     def get_permissions(self):
-        if self.action in ['create', 'buscar_por_cedula']:  # POST crear usuario o GET buscar por cédula
+        if self.action in ['create', 'buscar_por_cedula']:
             return [AllowAny()]
-        return [IsAuthenticated()]  # Para retrieve (por ID), list, update, destroy, etc.
+        return [IsAuthenticated()]
 
     def retrieve(self, request, *args, **kwargs):
         """Consulta de usuario por ID (protegida por token)."""
@@ -500,7 +500,7 @@ class UsuarioActualView(APIView):
 
 class BaseListView(ListAPIView):
     permission_classes = [AllowAny]
-    serializer_class = None  # Obligatorio redefinir
+    serializer_class = None
     queryset = None
 
     def list(self, request, *args, **kwargs):
@@ -711,9 +711,9 @@ def gestionar_turno(request):
         elif turno.tipo_turno.nombre.lower() == 'general' or turno.tipo_turno.id == 2:
             tiempo_estimado = turno.tipo_tramite.tiempo_espera
         else:
-            tiempo_estimado = 25  # Valor por defecto de seguridad
+            tiempo_estimado = 25
 
-        transcurrido = (ahora - turno.fecha_turno).total_seconds() / 60  # en minutos
+        transcurrido = (ahora - turno.fecha_turno).total_seconds() / 60
 
         porcentaje = transcurrido / tiempo_estimado if tiempo_estimado != 0 else 1
 
@@ -796,7 +796,7 @@ class LogoutView(APIView):
                 fecha_fin_atencion__isnull=True
             )
 
-            estado_finalizado = EstadoTurno.objects.get(id=3)  # También puedes usar nombre="Finalizado"
+            estado_finalizado = EstadoTurno.objects.get(id=3)
 
             for atencion in atenciones_activas:
                 atencion.fecha_fin_atencion = timezone.now()
@@ -976,7 +976,7 @@ class ListaFuncionariosVentanillaView(APIView):
         elif user.groups.filter(name="Ventanillas").exists():
             return Response(
                 {"mensaje": "No autorizado para consultar la lista de funcionarios"},
-                status=status.HTTP_200_OK  # Deja 200 para que el frontend lo pueda manejar como respuesta válida
+                status=status.HTTP_200_OK
             )
 
         return Response(

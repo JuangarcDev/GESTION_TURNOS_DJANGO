@@ -30,7 +30,7 @@ urlpatterns = [
     # Endpoints para JWT
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    # Incluir las URL de la aplicación
+    # Incluir las URL de la app
     path('api/', include('turnos_api.urls')),
 
     #URL DE DRF SPECTACULAR

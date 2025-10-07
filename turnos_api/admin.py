@@ -8,9 +8,9 @@ from django.contrib.auth.admin import UserAdmin
 class UserAdminCustom(UserAdmin):
     model = User
     list_display = ('username', 'email', 'is_staff', 'is_active')
-    filter_horizontal = ('groups',)  # Esto permitirá agregar/quitar grupos fácilmente
+    filter_horizontal = ('groups',)
 
-# Desregistramos y volvemos a registrar el User con la nueva configuración
+# Desregistramos y volvemos a registrar el User con la nueva config
 admin.site.unregister(User)
 admin.site.register(User, UserAdminCustom)
 
@@ -81,13 +81,13 @@ class FuncionarioAdmin(admin.ModelAdmin):
         }),
     )
 
-    # Cuando un usuario se asigne al grupo "Ventanillas", se creará automáticamente el Funcionario
+    # Cuando un usuario se asigne al grupo "Ventanillas", se crea el Funcionario relacionado
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         
         # Verificar si el usuario tiene el grupo "Ventanillas" asignado
         if "Ventanillas" in [group.name for group in obj.user.groups.all()]:
-            # Si el grupo "Ventanillas" está asignado, crear o actualizar el Funcionario
+            # Si el grupo "Ventanillas" ya fue asignado, crear o actualizar el Funcionario
             obj.save()
 
 @admin.register(Atencion)

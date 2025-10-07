@@ -40,7 +40,7 @@ def poblar_tablas_dominio(sender, **kwargs):
 
     with transaction.atomic():
 
-        # Renombrar secuencia antigua si quedó con el nombre anterior al rename del modelo
+        # Renombrar secuencia antigua si tiene el nombre anterior al rename del modelo
         renombrar_secuencia_antigua_si_existe()
         
         # Reiniciar secuencias ANTES de insertar con IDs fijos
@@ -106,7 +106,7 @@ def poblar_tablas_dominio(sender, **kwargs):
                 }
             )
 
-        # Actualizar secuencias para que continúen desde el último ID
+        # Actualizar secuencias para que sigan desde el ID final
         reset_sequence(TipoTurno)
         reset_sequence(EstadoTurno)
         reset_sequence(TipoTramite)

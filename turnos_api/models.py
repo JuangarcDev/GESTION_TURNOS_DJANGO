@@ -122,7 +122,7 @@ class Puesto(models.Model):
     id_ventanilla = models.ForeignKey(Ventanilla, on_delete=models.CASCADE, related_name="puestos")
     fecha_ingreso = models.DateTimeField(auto_now_add=True)
     fecha_salida = models.DateTimeField(blank=True, null=True)
-    token = models.CharField(max_length=255, blank=True, null=True, unique=True)  # NUEVO CAMPO
+    token = models.CharField(max_length=255, blank=True, null=True, unique=True)
 
     class Meta:
         indexes = [

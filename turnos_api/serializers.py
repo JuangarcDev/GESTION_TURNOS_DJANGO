@@ -16,7 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'first_name', 'last_name', 'email', 'groups']
 
 class FuncionarioDetalleSerializer(serializers.ModelSerializer):
-    user = UserSerializer()  # Incluye los grupos
+    user = UserSerializer()
 
     class Meta:
         model = Funcionario
@@ -75,7 +75,6 @@ class TurnoSerializer(serializers.ModelSerializer):
             'cedula_usuario',
             'tramite_color',
             'tipo_turno_color',
-            # nuevos campos
             'id_funcionario',
             'nombre_funcionario',
             'id_ventanilla',
@@ -84,9 +83,9 @@ class TurnoSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(serializers.IntegerField())
     def get_tiempo_estimado_maximo(self, obj):
-        if obj.tipo_turno.id == 1:  # Prioritario
+        if obj.tipo_turno.id == 1:
             return 15
-        elif obj.tipo_turno.id == 2:  # General
+        elif obj.tipo_turno.id == 2:
             return obj.tipo_tramite.tiempo_espera
         return None
 
@@ -149,7 +148,7 @@ class AtencionSerializer(serializers.ModelSerializer):
     def get_tiempo_atencion(self, obj):
         if obj.fecha_fin_atencion and obj.fecha_atencion:
             delta = obj.fecha_fin_atencion - obj.fecha_atencion
-            return round(delta.total_seconds() / 60, 2)  # puedes convertir a minutos si prefieres
+            return round(delta.total_seconds() / 60, 2)
         return None
 
 class PuestoSerializer(serializers.ModelSerializer):
@@ -235,6 +234,4 @@ class EstadisticasFuncionarioSerializer(serializers.Serializer):
 # SERIALIZADORES PARA EL MODULO DE ESTADISTICAS
 class EstadisticaLabelValorSerializer(serializers.Serializer):
     label = serializers.CharField(help_text="Nombre o categoría (ej. estado, trámite, fecha, etc.)")
-    value = serializers.FloatField(help_text="Valor numérico correspondiente")
-
-# COMENTARIOS PARA ACTUALIZAR EL SERIALIZADOR       
+    value = serializers.FloatField(help_text="Valor numérico correspondiente")    
