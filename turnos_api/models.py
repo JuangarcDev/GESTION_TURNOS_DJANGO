@@ -42,7 +42,39 @@ class EstadoVentanilla(models.Model):
 # MODELOS PRINCIPALES
 # ---------------------------------------------
 
+# AGREGAR ETNIA, GENERO Y DISCAPACIDAD - TIPO
 class Usuario(models.Model):
+    # CHOICES
+    GENERO_CHOICES = [
+        ('M', 'Masculino'),
+        ('F', 'Femenino'),
+        ('NB', 'No binario'),
+        ('O', 'Otro'),
+        ('NI', 'No informa'),
+    ]
+
+    ETNIA_CHOICES = [
+        ('IND', 'Indígena'),
+        ('ROM', 'ROM (Gitano)'),
+        ('RAI', 'Raizal'),
+        ('PAL', 'Palenquero'),
+        ('AFRO', 'Afrocolombiano'),
+        ('NING', 'Ninguno'),
+        ('NI', 'No informa'),
+    ]
+
+    DISCAPACIDAD_CHOICES = [
+        ('NING', 'Ninguna'),
+        ('FIS', 'Física'),
+        ('AUD', 'Auditiva'),
+        ('VIS', 'Visual'),
+        ('COG', 'Cognitiva'),
+        ('PSI', 'Psicosocial'),
+        ('MUL', 'Múltiple'),
+        ('NI', 'No informa'),
+    ]
+
+    # Atributos básicos
     nombres = models.CharField(max_length=100)
     apellidos = models.CharField(max_length=100)
     cedula = models.CharField(max_length=20, unique=True)
@@ -50,6 +82,30 @@ class Usuario(models.Model):
     email = models.EmailField(max_length=100, blank=True, null=True)
     direccion = models.CharField(max_length=100, blank=True, null=True)
     municipio = models.CharField(max_length=100)
+
+
+    # Nuevos Atributos
+    genero = models.CharField(
+        max_length=2,
+        choices=GENERO_CHOICES,
+        blank=True,
+        null=True
+    )
+
+    etnia = models.CharField(
+        max_length=5,
+        choices=ETNIA_CHOICES,
+        blank=True,
+        null=True
+    )
+
+    discapacidad = models.CharField(
+        max_length=5,
+        choices=DISCAPACIDAD_CHOICES,
+        blank=True,
+        null=True
+    )
+
     fecha_registro = models.DateTimeField(auto_now_add=True)
 
     class Meta:

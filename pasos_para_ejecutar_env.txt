@@ -24,3 +24,26 @@ http://127.0.0.1:8000/admin/login/?next=/admin/
 http://127.0.0.1:8000/api/
 
 https://gitlab.com/acc17/turnero
+
+USUARIO DE PRUEBA:
+
+juan.garcia
+PjUan2345678
+
+juanggg
+juangarciagrr@gmail.com
+1j2C3gG@A!g
+
+
+users:
+juangarcia
+PjUan2345678
+
+juan.garcia
+PjUan2345678
+
+paularagones
+P123456789s
+
+cryara
+C123456789a

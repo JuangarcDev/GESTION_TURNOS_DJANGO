@@ -112,6 +112,10 @@ class TurnoSerializer(serializers.ModelSerializer):
 
 
 class UsuarioSerializer(serializers.ModelSerializer):
+    genero_display = serializers.CharField(source='get_genero_display', read_only=True)
+    etnia_display = serializers.CharField(source='get_etnia_display', read_only=True)
+    discapacidad_display = serializers.CharField(source='get_discapacidad_display', read_only=True)
+
     class Meta:
         model = Usuario
         fields = '__all__'

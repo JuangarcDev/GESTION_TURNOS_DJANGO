@@ -662,33 +662,66 @@ def gestionar_turno(request):
         atencion_activa.fecha_fin_atencion = timezone.now()
         atencion_activa.save()
     else:
-        print("No existen turnos en atencion por finalizar.")
+        #print("No existen turnos en atencion por finalizar.")
+        pass
 
     # --- BUSCAR TURNO MAS PRIORITARIO ---
     ahora = timezone.now()
 
-    # ¿Hay ventanillas de productos en el sistema?
-    existe_ventanilla_productos = Ventanilla.objects.filter(nombre__icontains='prod').exists()
-    # ¿Es ventanilla de productos?
-    es_ventanilla_productos = 'prod' in ventanilla.nombre.lower()
-    # Filtrar turnos disponibles
-    turnos_disponibles = Turno.objects.select_related("tipo_tramite", "estado").filter(
+    #print("======================================")
+    #print(f"FUNCIONARIO: {funcionario}")
+    #print(f"VENTANILLA: {ventanilla.nombre}")
+
+    nombre_ventanilla = ventanilla.nombre.lower()
+
+    # Detectar tipo de ventanilla
+    if 'prod' in nombre_ventanilla:
+        tipo_ventanilla = "PRODUCTO"
+    elif 'not' in nombre_ventanilla:
+        tipo_ventanilla = "NOTIFICACION"
+    else:
+        tipo_ventanilla = "REGULAR"
+
+    #print(f"TIPO_VENTANILLA -> {tipo_ventanilla}")
+
+    # Turnos en espera
+    turnos_disponibles = Turno.objects.select_related(
+        "tipo_tramite", "estado"
+    ).filter(
         estado__nombre="Espera"
     )
 
-    # Aplicar lógica según existencia de ventanillas de productos
-    if existe_ventanilla_productos:
-        # Si existen ventanillas de productos, filtrar turnos por letra según tipo de ventanilla
-        if es_ventanilla_productos:
-            # Ventanilla productos: acepta turnos que empiezan con E o P
-            turnos_disponibles = turnos_disponibles.filter(
-                Q(turno__istartswith='E') | Q(turno__istartswith='P')
-            )
-        else:
-            # Otras ventanillas: excluyen turnos que empiezan con E o P (productos) funcionando
-            turnos_disponibles = turnos_disponibles.exclude(
-                Q(turno__istartswith='E') | Q(turno__istartswith='P')
-            )
+    #print(f"Turnos en espera (antes de filtrar): {turnos_disponibles.count()}")
+
+    # Aplicar filtro según tipo
+    if tipo_ventanilla == "PRODUCTO":
+        turnos_disponibles = turnos_disponibles.filter(
+            Q(turno__istartswith='E') |
+            Q(turno__istartswith='P')
+        )
+
+    elif tipo_ventanilla == "NOTIFICACION":
+        turnos_disponibles = turnos_disponibles.filter(
+            Q(turno__istartswith='N')
+        )
+
+    else:  # REGULAR
+        turnos_disponibles = turnos_disponibles.exclude(
+            Q(turno__istartswith='E') |
+            Q(turno__istartswith='P') |
+            Q(turno__istartswith='N')
+        )
+
+    #print(f"Turnos después de filtrar: {turnos_disponibles.count()}")
+
+    # Mostrar lista real de turnos
+    """
+    for t in turnos_disponibles:
+        print(f" -> TURNO: {t.turno} | ESTADO: {t.estado.nombre}")
+
+    print("======================================")
+    """
+
 
 # Si no hay turnos aplicables, retornar error
     if not turnos_disponibles.exists():
